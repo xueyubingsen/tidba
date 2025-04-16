@@ -33,37 +33,13 @@ jobs:
         with:
           fetch-depth: 1
           path: ${{ github.workspace }}
-      - name: Remove Old Docker Environment
-        run: |
-          sudo apt-get update
-          sudo apt remove docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc
-          sudo apt-get install curl -y
-      - name: Prepare New Docker Environment
-        run: |
-          curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
-      - name: View New Docker Environment
-        run: |
-          sudo docker -v
-          sudo docker info
-      - name: Build Cross Platform Environment
-        run: |
-          sudo docker build -f build.dockerfile -t build_docker_img .
-      - name: Build Cross Platform tidba Binary
-        run: |
-          sudo mkdir -p ${{ github.workspace }}/gocache
-          sudo docker run --rm -v ${{ github.workspace }}/gocache:/gocache build_docker_img
-
-          sudo mkdir -p ${{ github.workspace }}/build
-          sudo chmod -R 777 ${{ github.workspace }}/build
       - name: Pack Platform tidba Linux AMD64
         run: |
-          ls -lnrt ${{ github.workspace }}/gocache/linux/amd64
-          
+          cd ${{ github.workspace }}
+        
           sudo mkdir -p ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
           
-          cd ${{ github.workspace }}/gocache/linux/amd64
-          pwd
-          sudo mv tidba ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
+          CGO_ENABLED=0  GOOS=linux  GOARCH=amd64  go build -o ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64/tidba main.go
           
           sudo cp -r ${{ github.workspace }}/README.md ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
 
@@ -74,13 +50,11 @@ jobs:
           ls -lnrt ${{ github.workspace }}/build
       - name: Pack Platform tidba Linux ARM64
         run: |
-          ls -lnrt ${{ github.workspace }}/gocache/linux/arm64
-          
+          cd ${{ github.workspace }}
+        
           sudo mkdir -p ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
           
-          cd ${{ github.workspace }}/gocache/linux/arm64
-          pwd
-          sudo mv tidba ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
+          CGO_ENABLED=0  GOOS=linux  GOARCH=arm64  go build -o ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64/tidba main.go
           
           sudo cp -r ${{ github.workspace }}/README.md ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
 
@@ -88,7 +62,7 @@ jobs:
           pwd
           sudo tar -zcvf tidba-${{ github.ref_name }}-linux-arm64.tar.gz tidba-${{ github.ref_name }}-linux-arm64/
 
-          ls -lnrt ${{ github.workspace }}/build 
+          ls -lnrt ${{ github.workspace }}/build
       - name: Build Release Changelog
         id: github_release
         uses: mikepenz/release-changelog-builder-action@v4
