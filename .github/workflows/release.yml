@@ -35,27 +35,17 @@ jobs:
         with:
           fetch-depth: 1
           path: ${{ github.workspace }}
-      - name: Prepare build environment
-        id: prepare_build_env
+      - name: Build TiDBA Project Software
         run: |
-          sudo echo "REPO=github.com/wentaojin/tidba" >> $GITHUB_ENV
-          sudo echo "COMMIT=$(git describe --always --no-match --tags --dirty='-dev')" >> $GITHUB_ENV
-          sudo echo "BUILDTS=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
-          sudo echo "GITHASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
-          sudo echo "GITREF=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV    
+          cd ${{ github.workspace }}
+          sudo sh build.sh
       - name: Pack Platform tidba Linux AMD64
         run: |
-          LDFLAGS="-w -s"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.Version=${{ env.COMMIT }}'"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.BuildTS=${{ env.BUILDTS }}'"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.GitHash=${{ env.GITHASH }}'"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.GitBranch=${{ env.GITREF }}'"
-          
           cd ${{ github.workspace }}
         
           sudo mkdir -p ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
           
-          sudo CGO_ENABLED=0  GOOS=linux  GOARCH=amd64  go build -ldflags="${LDFLAGS}" -o ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64/tidba main.go
+          sudo mv ${{ github.workspace }}/linux/amd64/tidba ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
           
           sudo cp -r ${{ github.workspace }}/README.md ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
 
@@ -66,17 +56,11 @@ jobs:
           ls -lnrt ${{ github.workspace }}/build
       - name: Pack Platform tidba Linux ARM64
         run: |
-          LDFLAGS="-w -s"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.Version=${{ env.COMMIT }}'"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.BuildTS=${{ env.BUILDTS }}'"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.GitHash=${{ env.GITHASH }}'"
-          LDFLAGS+=" -X '${{ env.REPO }}/version.GitBranch=${{ env.GITREF }}'"
-          
           cd ${{ github.workspace }}
         
           sudo mkdir -p ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
           
-          sudo CGO_ENABLED=0  GOOS=linux  GOARCH=arm64  go build -ldflags="${LDFLAGS}" -o ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64/tidba main.go
+          sudo mv ${{ github.workspace }}/linux/arm64/tidba ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
           
           sudo cp -r ${{ github.workspace }}/README.md ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
 
