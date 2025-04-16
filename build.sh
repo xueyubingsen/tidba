@@ -20,10 +20,10 @@ GITREF=$(git rev-parse --abbrev-ref HEAD)
 LDFLAGS="-w -s"
 
 # Add build flags
-LDFLAGS+=" -X '$REPO/version.Version=$COMMIT'"
-LDFLAGS+=" -X '$REPO/version.BuildTS=$BUILDTS'"
-LDFLAGS+=" -X '$REPO/version.GitHash=$GITHASH'"
-LDFLAGS+=" -X '$REPO/version.GitBranch=$GITREF'"
+LDFLAGS+=" -X '$REPO/utils/version.Version=$COMMIT'"
+LDFLAGS+=" -X '$REPO/utils/version.BuildTS=$BUILDTS'"
+LDFLAGS+=" -X '$REPO/utils/version.GitHash=$GITHASH'"
+LDFLAGS+=" -X '$REPO/utils/version.GitBranch=$GITREF'"
 
 echo "Prepare build flags [$LDFLAGS]"
 
