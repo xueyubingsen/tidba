@@ -143,10 +143,10 @@ SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enab
 }
 
 func PrintTopsqlPlanCacheUsageComment(top int) {
-	fmt.Printf("记录时间窗口内影响 Plan Cache 执行计划缓存使用的 TOP %d，按照从大到小的顺序排列\n", top)
+	fmt.Printf("记录时间窗口内影响 Plan Cache 执行计划缓存使用的 TOP %d，按照从大到小的顺序排列 (仅当 Plan Cache 内存使用状态呈波动 / 上升状态进行查询)\n", top)
 	fmt.Println("NOTES：")
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
-	fmt.Println("- 以 SQL 语句执行次数排序，ONLY 匹配显示 IN OR INSERT INTO VALUES SQL 语句")
+	fmt.Println("- 查询结果以 SQL 语句执行次数排序，ONLY 匹配显示 IN OR INSERT INTO VALUES SQL 语句")
 	fmt.Println(`
 Executions：SQL 执行总次数
 Elap per Exec(s)：每次执行平均 SQL 耗时

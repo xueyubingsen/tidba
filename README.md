@@ -1,6 +1,6 @@
 # TiDBA
 
-TiDB 数据库 DBA 运维工具集（交互式 / 非交互式 CLI），涵盖数据库自动化巡检、故障应急诊断、批量写入热点打散、参数变量对比等常见运维命令集。
+TiDB 数据库 DBA 运维工具集（交互式 / 非交互式 CLI），涵盖数据库自动化巡检、故障应急诊断、批量写入热点打散、参数变量对比、交互式 CLI SQL 语句执行（Select、Use、Explain、Show）等常见运维命令集。
 
 **NOTES:**
 1. 使用时必须跟 TiUP 中控机所在用户环境 Shell 保持一致，即沿用 TiUP 部分元数据信息
@@ -167,4 +167,24 @@ $ ./tidba kill sql -c {clusterName} --users {username1,username2} [--duration 30
 
 交互式命令(除 tidba 字样之外其他保持一致)
 tidba[tidb-jwt00] »»» kill {subCommand} ...flags
+```
+### SQL 命令
+
+sql 命令功能集合:
+- sql display 基于 sql digest 显示 sql 执行详情，涵盖执行计划、执行信息等
+- sql bind 基于 sql digest 进行执行计划创建、删除、查询等
+  
+```
+示例：
+非交互命令
+$ ./tidba sql display -c {clusterName} --sql-digest {sqlDigest1} [--nearly 30 / --start {startTime} --end {endTime} ] [--enable-sql] [--enable-history]
+
+$ ./tidba sql bind create -c {clusterName} --sql-digest {sqlDigest1} [--schema {schemaName}] [--nearly 30 / --start {startTime} --end {endTime} ] [--enable-sql] [--enable-history]
+
+$ ./tidba sql bind query -c {clusterName}
+
+$ ./tidba sql bind delete -c {clusterName} --sql-digest {sqlDigest1} [--schema {schemaName}] [--nearly 30 / --start {startTime} --end {endTime} ] [--enable-sql] [--enable-history]
+
+交互式命令(除 tidba 字样之外其他保持一致)
+tidba[tidb-jwt00] »»» sql {subCommand} ...flags
 ```

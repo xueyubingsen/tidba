@@ -146,10 +146,10 @@ func TopsqlRunaway(ctx context.Context, clusterName string, resourceGroup, sqlDi
 					}
 				} else {
 					if sqlDigest != "" {
-						limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL DIGEST '%s'", resourceGroup, rcName, sqlDigest))
+						limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL DIGEST '%s'", r, rcName, sqlDigest))
 					}
 					if sqlText != "" {
-						limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL TEXT EXACT TO "%s"`, resourceGroup, rcName, sqlText))
+						limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL TEXT EXACT TO "%s"`, r, rcName, sqlText))
 					}
 				}
 			}

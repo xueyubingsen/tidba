@@ -372,7 +372,7 @@ from (SELECT
 		bs.WriteString(fmt.Sprintf("AND a.INSTANCE IN (%s)\n", strings.Join(instances, ",")))
 		bs.WriteString("AND (UPPER(a.QUERY_SAMPLE_TEXT) LIKE '%%WHERE%%IN%%' OR UPPER(a.QUERY_SAMPLE_TEXT) LIKE '%%INSERT%%INTO%%' OR UPPER(a.QUERY_SAMPLE_TEXT) LIKE '%%REPLACE%%INTO%%')\n")
 	}
-	bs.WriteString("AND a.STMT_TYPE IN ('Select','Insert','Replace)\n")
+	bs.WriteString("AND a.STMT_TYPE IN ('Select','Insert','Replace')\n")
 	bs.WriteString(`AND a.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'` + "\n")
 
 	bs.WriteString(fmt.Sprintf(`GROUP BY

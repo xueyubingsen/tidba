@@ -6,6 +6,7 @@ require (
 	github.com/ScaleFT/sshkeys v1.2.0
 	github.com/charmbracelet/bubbletea v1.3.3
 	github.com/charmbracelet/lipgloss v1.0.0
+	github.com/creack/pty v1.1.24
 	github.com/fatih/color v1.10.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-runewidth v0.0.16
@@ -45,6 +46,7 @@ require (
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.4 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
@@ -73,9 +75,11 @@ require (
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/shopspring/decimal v1.4.0
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spf13/cobra v1.8.1
 	github.com/tidwall/pretty v1.2.1
 	github.com/twotwotwo/sorts v0.0.0-20160814051341-bf5c1f2b8553
+	github.com/vishvananda/netlink v1.3.0
 	github.com/xuri/excelize/v2 v2.9.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0

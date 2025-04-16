@@ -514,11 +514,11 @@ func GenerateTimestampTSO(nearly int, start, end string) (int64, int64, error) {
 	}
 
 	layout := "2006-01-02 15:04:05"
-	parsedStime, err := time.Parse(layout, start)
+	parsedStime, err := time.ParseInLocation(layout, start, time.Local)
 	if err != nil {
 		return 0, 0, err
 	}
-	parsedEtime, err := time.Parse(layout, end)
+	parsedEtime, err := time.ParseInLocation(layout, end, time.Local)
 	if err != nil {
 		return 0, 0, err
 	}

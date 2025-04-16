@@ -70,7 +70,10 @@ func (a *AppLogin) Cmd() *cobra.Command {
 			// type assertion to get the final model state
 			lModel := teaModel.(model.ClusterLoginModel)
 
-			if lModel.Error == nil && len(lModel.Msgs) > 0 {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if len(lModel.Msgs) > 0 {
 				t := table.NewWriter()
 				t.AppendHeader(table.Row{"cluster_name", "database", "path", "private_key"})
 				t.AppendSeparator()
@@ -86,7 +89,7 @@ func (a *AppLogin) Cmd() *cobra.Command {
 
 			// reset app prompt
 			if !a.disableInteractive {
-				cli.SetClusterPrompt(a.clusterName)
+				cli.SetClusterName(a.clusterName)
 			}
 			return nil
 		},
@@ -125,7 +128,7 @@ func (a *AppLogout) Cmd() *cobra.Command {
 			}
 			// reset app prompt
 			if !a.disableInteractive {
-				cli.SetDefaultPrompt()
+				cli.ResetClusterName()
 			}
 			return nil
 		},

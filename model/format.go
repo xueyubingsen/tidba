@@ -18,11 +18,12 @@ package model
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-func QueryResultFormatTableStyle(columns []string, results []map[string]string) error {
+func QueryResultFormatTableStyle(columns []string, results []map[string]string, sec ...float64) error {
 	t := table.NewWriter()
 
 	var header table.Row
@@ -32,7 +33,42 @@ func QueryResultFormatTableStyle(columns []string, results []map[string]string) 
 	t.AppendHeader(header)
 	t.AppendSeparator()
 	t.AppendRows(queryResultProcess(columns, results))
-	_, err := fmt.Fprintln(os.Stdout, t.Render()+"\n\n")
+	if len(sec) > 0 {
+		t.SetCaption("%d rows in set (%.2f sec)\n", len(results), sec[0])
+		_, err := fmt.Fprintln(os.Stdout, t.Render())
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	_, err := fmt.Fprintln(os.Stdout, t.Render()+"\n")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func QueryResultFormatWithoutTableStyle(columns []string, results []map[string]string, sec ...float64) error {
+	var bs []string
+
+	for i, res := range results {
+		var b strings.Builder
+		b.WriteString(fmt.Sprintf("*************************** %d. row ***************************\n", i+1))
+		for _, c := range columns {
+			for k, v := range res {
+				if k == c {
+					if v == "NULLABLE" {
+						b.WriteString(fmt.Sprintf("  %s: %v\n", c, "NULL"))
+					} else {
+						b.WriteString(fmt.Sprintf("  %s: %v\n", c, v))
+					}
+				}
+			}
+		}
+		bs = append(bs, b.String())
+	}
+	bs = append(bs, fmt.Sprintf("%d rows in set (%.2f sec)\n", len(results), sec[0]))
+	_, err := fmt.Fprintln(os.Stdout, strings.Join(bs, "\n"))
 	if err != nil {
 		return err
 	}
@@ -44,10 +80,14 @@ func queryResultProcess(columns []string, results []map[string]string) []table.R
 
 	for _, res := range results {
 		var newRow table.Row
-		for k, v := range res {
-			for _, c := range columns {
+		for _, c := range columns {
+			for k, v := range res {
 				if k == c {
-					newRow = append(newRow, v)
+					if v == "NULLABLE" {
+						newRow = append(newRow, "NULL")
+					} else {
+						newRow = append(newRow, v)
+					}
 				}
 			}
 		}
@@ -76,7 +116,7 @@ func QueryResultFormatTableStyleWithRowsArray(columns []string, rows [][]interfa
 
 	t.AppendRows(newRows)
 
-	_, err := fmt.Fprintln(os.Stdout, t.Render()+"\n\n")
+	_, err := fmt.Fprintln(os.Stdout, t.Render()+"\n")
 	if err != nil {
 		return err
 	}

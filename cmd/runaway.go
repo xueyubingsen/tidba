@@ -36,8 +36,8 @@ func (a *App) AppRunaway() Cmder {
 func (a *AppRunaway) Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "runaway",
-		Short: "RUNAWAY Used to fast SQL flow control based on resource control and problematic statement sql digest（require >= v8.5.0）",
-		Long:  "RUNAWAY Used to fast SQL flow control based on resource control and problematic statement sql digest where the specified cluster name is located（require >= v8.5.0）",
+		Short: "Runaway Used to fast SQL flow control based on resource control and problematic statement sql digest（require >= v8.5.0）",
+		Long:  "Runaway Used to fast SQL flow control based on resource control and problematic statement sql digest where the specified cluster name is located（require >= v8.5.0）",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if a.clusterName == "" {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)

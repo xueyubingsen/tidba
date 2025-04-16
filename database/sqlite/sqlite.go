@@ -57,6 +57,8 @@ func NewDatabase(dbPath string) (*Database, error) {
 		&Cluster{},
 		&Inspect{},
 		&ResourceGroup{},
+		&SqlBinding{},
+		&License{},
 	); err != nil {
 		return nil, fmt.Errorf("migrate the sqlite table error: [%s]", err)
 	}
@@ -274,4 +276,123 @@ func (d *Database) GetResourceGroup(ctx context.Context, clusterName string) (*R
 		return nil, fmt.Errorf("get table [%s] record failed: %v", d.ResourceGroupTableName(ctx), err)
 	}
 	return data, nil
+}
+
+func (d *Database) SqlBindingTableName(ctx context.Context) string {
+	return d.DB.NamingStrategy.TableName(reflect.TypeOf(SqlBinding{}).Name())
+}
+
+func (d *Database) CreateSqlBinding(ctx context.Context, data *SqlBinding) (*SqlBinding, error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	err := d.DB.Create(data).Error
+	if err != nil {
+		return nil, fmt.Errorf("create table [%s] record failed: %v", d.SqlBindingTableName(ctx), err)
+	}
+	return data, nil
+}
+
+func (d *Database) DeleteSqlBinding(ctx context.Context, clusterName string, schemaName string, sqlDigest string) (*SqlBinding, error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	var data *SqlBinding
+	if err := d.DB.Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&SqlBinding{}).Where("cluster_name = ? AND schema_name = ? AND sql_digest = ?", clusterName, schemaName, sqlDigest).Find(&data).Limit(1).Error
+		if err != nil {
+			return fmt.Errorf("get table [%s] record failed: %v", d.SqlBindingTableName(ctx), err)
+		}
+		err = tx.Where("cluster_name = ? AND schema_name = ? AND sql_digest = ?", clusterName, schemaName, sqlDigest).Delete(&SqlBinding{}).Error
+		if err != nil {
+			return fmt.Errorf("delete table [%s] record failed: %v", d.SqlBindingTableName(ctx), err)
+		}
+		return nil
+	}); err != nil {
+		return data, err
+	}
+	return data, nil
+}
+
+func (d *Database) GetSqlBinding(ctx context.Context, clusterName string, schemaName string, sqlDigest string) (*SqlBinding, error) {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	var data *SqlBinding
+	err := d.DB.Model(&SqlBinding{}).Where("cluster_name = ? AND schema_name = ? AND sql_digest = ?", clusterName, schemaName, sqlDigest).Find(&data).Limit(1).Error
+	if err != nil {
+		return nil, fmt.Errorf("get table [%s] record failed: %v", d.SqlBindingTableName(ctx), err)
+	}
+	return data, nil
+}
+
+func (d *Database) FindSqlBinding(ctx context.Context, clusterName string) ([]*SqlBinding, error) {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	var data []*SqlBinding
+	err := d.DB.Model(&SqlBinding{}).Where("cluster_name = ?", clusterName).Find(&data).Error
+	if err != nil {
+		return nil, fmt.Errorf("find table [%s] record failed: %v", d.SqlBindingTableName(ctx), err)
+	}
+	return data, nil
+}
+
+func (d *Database) LicenseTableName(ctx context.Context) string {
+	return d.DB.NamingStrategy.TableName(reflect.TypeOf(License{}).Name())
+}
+
+func (d *Database) CreateLicense(ctx context.Context, data *License) (*License, error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	err := d.DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "mac_address"}},
+		UpdateAll: true},
+	).Create(data).Error
+	if err != nil {
+		return nil, fmt.Errorf("create table [%s] record failed: %v", d.LicenseTableName(ctx), err)
+	}
+	return data, nil
+}
+
+func (d *Database) DeleteLicense(ctx context.Context, macAddr string) (*License, error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	var data *License
+	if err := d.DB.Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&License{}).Where("mac_address = ?", macAddr).Find(&data).Limit(1).Error
+		if err != nil {
+			return fmt.Errorf("get table [%s] record failed: %v", d.LicenseTableName(ctx), err)
+		}
+		err = tx.Where("mac_address = ?", macAddr).Delete(&License{}).Error
+		if err != nil {
+			return fmt.Errorf("delete table [%s] record failed: %v", d.LicenseTableName(ctx), err)
+		}
+		return nil
+	}); err != nil {
+		return data, err
+	}
+	return data, nil
+}
+
+func (d *Database) GetLicense(ctx context.Context, macAddr string) (*License, error) {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	var data *License
+	err := d.DB.Model(&License{}).Where("mac_address = ?", macAddr).Find(&data).Limit(1).Error
+	if err != nil {
+		return nil, fmt.Errorf("get table [%s] record failed: %v", d.LicenseTableName(ctx), err)
+	}
+	return data, nil
+}
+
+func (d *Database) UpdateLicense(ctx context.Context, macAddr string, updates map[string]interface{}) error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	err := d.DB.Model(&License{}).Where("mac_address = ?", macAddr).Updates(updates).Error
+	if err != nil {
+		return fmt.Errorf("update table [%s] record failed: %v", d.LicenseTableName(ctx), err)
+	}
+	return nil
 }

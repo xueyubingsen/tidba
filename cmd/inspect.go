@@ -268,6 +268,7 @@ type AppClusterInspectStart struct {
 	ssh          string
 	concurrency  int
 	output       string
+	sshPort      int
 }
 
 func (a *AppInspect) AppClusterInspectStart() Cmder {
@@ -319,7 +320,7 @@ func (a *AppClusterInspectStart) Cmd() *cobra.Command {
 			l = printer.NewLogger("inspector")
 			gOpt = &operator.Options{
 				SSHUser:     a.sshUser,
-				SSHPort:     22,
+				SSHPort:     a.sshPort,
 				SSHTimeout:  a.sshTimeout,
 				OptTimeout:  a.waitTimeout,
 				SSHType:     executor.SSHType(a.ssh),
@@ -391,5 +392,7 @@ func (a *AppClusterInspectStart) Cmd() *cobra.Command {
 	cmd.Flags().StringVarP(&a.identityFile, "identity", "i", "~/.ssh/id_rsa", "The path of the SSH identity file. If specified, public key authentication will be used. (default: ~/.ssh/id_rsa)")
 	cmd.Flags().StringVarP(&a.output, "output", "o", "/tmp", "Configure the inspection report output directory")
 	cmd.Flags().IntVar(&a.concurrency, "concurrency", 5, "max number of parallel tasks to run")
+	cmd.Flags().IntVar(&a.sshPort, "port", 22, "SSH port to use for the connection (default: 22)")
+
 	return cmd
 }

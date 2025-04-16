@@ -742,11 +742,11 @@ func (i *Insepctor) InspClusterSummary() ([]*ClusterSummary, error) {
 		return nil, err
 	}
 
-	currentTime := time.Now().UTC()
+	currentTime := time.Now()
 
 	for _, r := range res {
 		// Parse start time with timezone
-		startTimestamp, err := time.Parse(time.RFC3339, r["START_TIME"])
+		startTimestamp, err := time.ParseInLocation(time.RFC3339, r["START_TIME"], time.Local)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing start time: %v", err)
 		}
@@ -1078,14 +1078,14 @@ HAVING
 
 	for _, r := range res {
 		if strings.EqualFold(r["VARIABLE_NAME"], "tikv_gc_last_run_time") {
-			customTime, err := time.Parse(customTimeFormat, r["VARIABLE_VALUE"])
+			customTime, err := time.ParseInLocation(customTimeFormat, r["VARIABLE_VALUE"], time.Local)
 			if err != nil {
 				return nil, fmt.Errorf("parse tikv_gc_last_run_time time [%s] failed: %v", r["VARIABLE_VALUE"], err)
 			}
 			gcLastRunUnix = customTime.Unix()
 			originGcLastRunTime = customTime.UTC().Format("2006-01-02 15:04:05.000")
 		} else if strings.EqualFold(r["VARIABLE_NAME"], "tikv_gc_safe_point") {
-			customTime, err := time.Parse(customTimeFormat, r["VARIABLE_VALUE"])
+			customTime, err := time.ParseInLocation(customTimeFormat, r["VARIABLE_VALUE"], time.Local)
 			if err != nil {
 				return nil, fmt.Errorf("parse tikv_gc_safe_point time [%s] failed: %v", r["VARIABLE_VALUE"], err)
 			}

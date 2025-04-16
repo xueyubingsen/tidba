@@ -63,3 +63,32 @@ type ResourceGroup struct {
 	ResourceGroupName string `gorm:"not null;type:varchar(120);comment:name of switch resource group" json:"resourceGroupName"`
 	*Entity
 }
+
+type SqlBinding struct {
+	ID           uint64 `gorm:"primarykey;autoIncrement;comment:id" json:"id"`
+	ClusterName  string `gorm:"not null;type:varchar(120);uniqueIndex:uniq_cluster_complex;comment:name of cluster" json:"clusterName"`
+	SchemaName   string `gorm:"not null;type:varchar(120);uniqueIndex:uniq_cluster_complex;comment:schema name of sql digest" json:"schemaName"`
+	SqlDigest    string `gorm:"not null;type:varchar(120);uniqueIndex:uniq_cluster_complex;comment:sql digest" json:"sqlDigest"`
+	DigestText   string `gorm:"not null;type:varchar(120);comment:sql digest text" json:"digestText"`
+	OptimizeText string `gorm:"not null;type:varchar(120);comment:optimize sql digest text" json:"OptimizeText"`
+	*Entity
+}
+
+func (i *SqlBinding) String() string {
+	val, _ := json.MarshalIndent(i, "", " ")
+	return string(val)
+}
+
+type License struct {
+	ID         uint64 `gorm:"primarykey;autoIncrement;comment:id" json:"id"`
+	Username   string `gorm:"not null;type:varchar(120);comment:username" json:"username"`
+	MacAddress string `gorm:"not null;type:varchar(120);uniqueIndex:uniq_mac_address;comment:mac address" json:"macAddress"`
+	ExpireTime string `gorm:"not null;type:int;comment:license expire time" json:"expireTime"`
+	License    string `gorm:"not null;type:varchar(120);comment:license" json:"License"`
+	*Entity
+}
+
+func (i *License) String() string {
+	val, _ := json.MarshalIndent(i, "", " ")
+	return string(val)
+}

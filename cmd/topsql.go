@@ -366,7 +366,7 @@ func (a *AppTopsqlCPU) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
-	cmd.Flags().StringVar(&a.component, "component", "tidb", "configure the cluster database query component cpu time, options: tidb / tikv")
+	cmd.Flags().StringVar(&a.component, "component", "tikv", "configure the cluster database query component cpu time, options: tidb / tikv")
 	cmd.Flags().StringSliceVar(&a.instances, "instances", nil, "configure the cluster database query component instances cpu time, need configure {instAddr:statusPort}")
 	cmd.Flags().IntVar(&a.concurrency, "concurrency", 5, "configure the cluster database query component cpu time concurrency")
 
@@ -515,9 +515,13 @@ func (a *AppTopsqlMemory) Cmd() *cobra.Command {
 						}
 					} else if r.MsgType == topsql.DefaultPlanCacheMsgType {
 						topsql.PrintTopsqlPlanCacheUsageComment(a.top)
-						fmt.Println("\ncluster topsql plan cache query content:")
-						if err := model.QueryResultFormatTableStyleWithRowsArray(r.Columns, r.Results); err != nil {
-							return err
+						if len(r.Results) == 0 {
+							fmt.Println("\nNo fluctuation or upward trend was found in the cluster plan cache time window, ignoring display.")
+						} else {
+							fmt.Println("\ncluster topsql plan cache query content:")
+							if err := model.QueryResultFormatTableStyleWithRowsArray(r.Columns, r.Results); err != nil {
+								return err
+							}
 						}
 					} else {
 						return fmt.Errorf("unknown topsql query msg type [%s]", r.MsgType)
