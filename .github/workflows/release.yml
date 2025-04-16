@@ -38,7 +38,7 @@ jobs:
       - name: Build TiDBA Project Software
         run: |
           cd ${{ github.workspace }}
-          sudo ./${{ github.workspace }}/build.sh
+          sudo ./build.sh
       - name: Pack Platform tidba Linux AMD64
         run: |
           cd ${{ github.workspace }}
