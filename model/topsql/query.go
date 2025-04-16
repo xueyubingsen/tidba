@@ -73,7 +73,7 @@ func GenerateTopsqlElapsedTimeQuery(nearly, top int, start, end string, enableHi
                MAX(max_latency) / 1000000000 "max_latency_s",
                AVG(AVG_TOTAL_KEYS) "avg_total_keys",
                AVG(AVG_PROCESSED_KEYS) "avg_processed_keys",
-               ROUND(SUM(sum_latency) / 1000000000 / %v,2) "percentage",
+               ROUND(IFNULL(SUM(sum_latency),0) / 1000000000 / %v,2) "percentage",
                DIGEST "sql_digest",
                MIN(QUERY_SAMPLE_TEXT) "sql_text"`, totalLatency) + "\n")
 	if enableHistory {
@@ -111,7 +111,7 @@ from (SELECT
     MAX(max_latency) / 1000000000 "max_latency_s",
     AVG(AVG_TOTAL_KEYS) "avg_total_keys",
     AVG(AVG_PROCESSED_KEYS) "avg_processed_keys",
-    ROUND(SUM(sum_latency) / 1000000000 / %v,2) "percentage",
+    ROUND(IFNULL(SUM(sum_latency),0) / 1000000000 / %v,2) "percentage",
     DIGEST "sql_digest",
     MIN(QUERY_SAMPLE_TEXT) "sql_text"`, totalLatency) + "\n")
 	if enableHistory {
@@ -211,7 +211,7 @@ from (SELECT
 
 	bs.WriteString(`AVG(AVG_TOTAL_KEYS) as avg_total_keys,
     AVG(AVG_PROCESSED_KEYS) as avg_processed_keys,` + "\n")
-	bs.WriteString(fmt.Sprintf(`ROUND(SUM(sum_latency) / 1000000000 / %v,2) "percentage",`, totalLatency) + "\n")
+	bs.WriteString(fmt.Sprintf(`ROUND(IFNULL(SUM(sum_latency),0) / 1000000000 / %v,2) "percentage",`, totalLatency) + "\n")
 	bs.WriteString(`DIGEST as sql_digest,
     MIN(QUERY_SAMPLE_TEXT) as sql_text` + "\n")
 	if enableHistory {
@@ -681,7 +681,11 @@ func TopsqlDiagnosis(ctx context.Context, clusterName string, db *mysql.Database
 	if len(res) == 0 {
 		return nil, fmt.Errorf("the database sql [%v] query time windows result not found", totalLatencySql)
 	} else {
-		totalLatency = res[0]["all_latency_s"]
+		if res[0]["all_latency_s"] == "NULLABLE" {
+			totalLatency = "1"
+		} else {
+			totalLatency = res[0]["all_latency_s"]
+		}
 	}
 
 	globalSqlDigest := make(map[string]struct{})

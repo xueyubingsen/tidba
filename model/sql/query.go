@@ -65,7 +65,7 @@ func GenerateSqlDisplaySummaryQuery(nearly int, start, end string, enableHistory
     AVG(avg_compile_latency) / 1000000000 "avg_compile_latency_s",
     AVG(AVG_TOTAL_KEYS) as avg_total_keys,
     AVG(AVG_PROCESSED_KEYS) as avg_processed_keys,
-    ROUND(SUM(sum_latency) / 1000000000 / %v,2) "percentage"`, totalLatency) + "\n")
+    ROUND(IFNULL(SUM(sum_latency),0) / 1000000000 / %v,2) "percentage"`, totalLatency) + "\n")
 	if enableHistory {
 		bs.WriteString(`FROM information_schema.cluster_statements_summary_history a` + "\n")
 	} else {
@@ -114,7 +114,11 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 	if len(res) == 0 {
 		return nil, fmt.Errorf("the database sql [%v] query time windows result not found", totalLatencySql)
 	} else {
-		totalLatency = res[0]["all_latency_s"]
+		if res[0]["all_latency_s"] == "NULLABLE" {
+			totalLatency = "1"
+		} else {
+			totalLatency = res[0]["all_latency_s"]
+		}
 	}
 
 	disummarieSql, err := GenerateSqlDisplaySummaryQuery(nearly, start, end, enableHistory, totalLatency, sqlDigest)
@@ -357,7 +361,11 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 		if len(res) == 0 {
 			return nil, fmt.Errorf("the database history sql [%v] query time windows result not found", allLatencySql)
 		} else {
-			totalLatency = res[0]["all_latency_s"]
+			if res[0]["all_latency_s"] == "NULLABLE" {
+				totalLatency = "1"
+			} else {
+				totalLatency = res[0]["all_latency_s"]
+			}
 		}
 
 		disummarieSql, err := GenerateSqlDisplaySummaryQuery(0, ts[0], ts[1], true, totalLatency, sqlDigest)
@@ -389,7 +397,6 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 			row = append(row, fmt.Sprintf("%v%%", float.Mul(decimal.NewFromInt(100))))
 			histRows = append(histRows, row)
 		}
-
 	}
 
 	qrsm.QueriedTrendSummary = &QueriedResultMsg{
