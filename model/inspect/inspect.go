@@ -746,7 +746,7 @@ func (i *Insepctor) InspClusterSummary() ([]*ClusterSummary, error) {
 
 	for _, r := range res {
 		// Parse start time with timezone
-		startTimestamp, err := time.ParseInLocation(time.RFC3339, r["START_TIME"], time.Local)
+		startTimestamp, err := time.ParseInLocation("2006-01-02 15:04:05", r["START_TIME"], time.Local)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing start time: %v", err)
 		}
@@ -2365,11 +2365,11 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				return err
 			}
 			for inst, avg := range avgVal {
-				machineCpu := machineCpu[strings.Split(inst, ":")[0]]
+				hostCpu := machineCpu[strings.Split(inst, ":")[0]]
 
-				cpuLimitI, err := strconv.ParseInt(machineCpu, 10, 64)
+				cpuLimitI, err := strconv.ParseInt(hostCpu, 10, 64)
 				if err != nil {
-					return fmt.Errorf("pd machine cpu parse value [%s] failed: %v", machineCpu, err)
+					return fmt.Errorf("pd machine cpu parse value [%s] failed: %v", hostCpu, err)
 				}
 
 				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
@@ -2378,7 +2378,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 						MonitoringItems: "cpu usage",
 						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
 						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
-						ParamValue:      machineCpu,
+						ParamValue:      hostCpu,
 						SuggestValue:    "应低于 80% * cpu limit",
 						Comment:         "读取服务器 vcore 数量",
 					})
