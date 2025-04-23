@@ -51,8 +51,8 @@ tidba[tidb-jwt00] »»» inspect {subCommand}
 split 命令功能集：
 - split range 基于数据库表已有数据，自动生成数据以及索引打散语句
 - split key 基于数据库表已有 region key，自动生成数据以及索引打散语句
-- split estimate 采样指定数据库表某些字段 columns 所在数据，自动生成索引打散语句
-- split sampling 采样指定数据表某个索引名 index 所在字段数据，自动生成索引打散语句
+- split estimate 采样指定数据库表某些字段 columns 所在数据，自动 ONLY 生成索引打散语句
+- split sampling 采样指定数据表某个索引名 index 所在字段数据，自动 ONLY 生成索引打散语句
 
 ```
 示例：
@@ -63,10 +63,10 @@ $ ./tidba split range -c {clusterName} --database {dbName} --tables {table1,tabl
 基于已有数据，根据 key 生成打散
 $ ./tidba split key -c {clusterName} --database {dbName} --tables {table1,table2} --daemon
 
-基于基础采样表，根据 distinct 生成打散（因子放大倍数，数据量大的情况下资源耗用主要在于机器资源且比较大）
-$ ./tidba split estimate -c {clusterName} --database {dbName} --tables {tableName} --columns {column1,column2} --new-db {newDbName} --new-table {newTableName} --new-index {newIndexName} --estimate-row {estimateRows} --estimate-size {estimateSize} --daemon
+基于基础采样表某个或某几个字段数据，根据 distinct 生成打散
+$ ./tidba split estimate -c {clusterName} --database {dbName} --tables {tableName} --columns {column1,column2} --new-db {newDbName} --new-table {newTableName} --new-index {newIndexName} --estimate-size {estimateSize} --daemon
 
-基于基础采样表，根据 distinct 生成打散
+基于基础采样表某个索引名 index 所在字段数据，根据 distinct 生成打散
 --resource server 数据量大的情况下,资源耗用主要在于机器资源且相对折中
 --resource database 数据量大的情况下,资源耗用主要位于数据库
 $ ./tidba split sampling  -c {clusterName} --database {dbName} --tables {tableName} --index {indexName} --new-db {newDbName} --new-table {newTableName} --new-index {newIndexName} --estimate-row {estimateRows} --resource server --daemon
@@ -87,14 +87,14 @@ region 命令功能集：
 非交互式命令
 
 查找集群数据库热点 region 信息
-$ ./tidba region hotspot -c {clusterName} --database {dbName} --stores {tikv1:servicePort1,tikv1:servicePort2} --tables {tableName} --indexes {indexName1,indexName2} --type {write/read/all} --top 10
+$ ./tidba region hotspot -c {clusterName} --database {dbName} [--stores {tikv1:servicePort1,tikv1:servicePort2}] [--tables {tableName}] [--indexes {indexName1,indexName2}] --type {write/read/all} --top 10
 
 查看数据以及索引 region leader 分布
-$ ./tidba region leader -c {clusterName} --database {dbName} --stores {tikv1:servicePort1,tikv1:servicePort2} --tables {tableName} --indexes {indexName1,indexName2}
+$ ./tidba region leader -c {clusterName} --database {dbName} [--stores {tikv1:servicePort1,tikv1:servicePort2}] --tables {tableName} [--indexes {indexName1,indexName2}]
 
 当 down tikv 宕机不可用，查找集群内所有 down-peer 副本数大于或等于正常副本数（多数派副本 DOWN）的所有 region 信息【忽略已被删除但未 GC 的 Region 信息】
 假设三副本集群，存在 kv 节点 1,2,28,30，若 down store 1,28 宕机不可用，查找指定 down kv 节点地址集群内所有 Down 副本数大于或等于正常副本数（多数派副本 DOWN）的所有 region 信息
-$ ./tidba region replica -c {clusterName} --stores {tikv1:servicePort1,tikv2:servicePort2} --region-type {all/data/index} --daemon
+$ ./tidba region replica -c {clusterName} [--stores {tikv1:servicePort1,tikv2:servicePort2}] --region-type {all/data/index} --daemon
 
 -- 查找指定的 region 信息
 $ ./tidba region query -c {clusterName} --region-ids {region1,region2,region3} 

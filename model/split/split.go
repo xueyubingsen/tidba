@@ -115,7 +115,7 @@ func RunTableSplitTask(ctx context.Context, clusterName string, req *SplitReqMsg
 					return err
 				}
 			case "ESTIMATE":
-				if _, err := t.EstimateCommand(gCtx, req.ColumnNames, req.NewDbName, req.NewTableName, req.NewIndexName, req.EstimateRows, req.EstimateSize, req.Concurrency, req.RegionSize); err != nil {
+				if _, err := t.EstimateCommand(gCtx, req.ColumnNames, req.NewDbName, req.NewTableName, req.NewIndexName, req.EstimateSize, req.Concurrency, req.RegionSize); err != nil {
 					return err
 				}
 			default:

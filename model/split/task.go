@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/twotwotwo/sorts/sortutil"
+	"github.com/shopspring/decimal"
 	"github.com/wentaojin/tidba/database/mysql"
 	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/utils/stringutil"
@@ -172,23 +172,17 @@ GROUP BY
 	queryTime = time.Now()
 	totalRowCount := 0
 
-	queryStr = fmt.Sprintf("SELECT COUNT(1) FROM `%s`.`%s`", t.DbName, t.TableName)
+	queryStr = fmt.Sprintf("SELECT COUNT(1) AS COUNT FROM `%s`.`%s`", t.DbName, t.TableName)
 	tableInfo.appendSql(queryStr)
 
-	if err = t.Engine.QueryRows(ctx, queryStr, func(row, cols []string) error {
-		if len(row) != 1 {
-			return fmt.Errorf("result row is not index column name, should never happen")
-		}
-		v, err := strconv.Atoi(row[0])
-		if err != nil {
-			return err
-		}
-		totalRowCount = v
-		return nil
-	}); err != nil {
+	_, res, err = t.Engine.GeneralQuery(ctx, queryStr)
+	if err != nil {
 		return tableInfo, fmt.Errorf("the database table [%s.%s] run sql [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 	}
-
+	totalRowCount, err = strconv.Atoi(res[0]["COUNT"])
+	if err != nil {
+		return tableInfo, err
+	}
 	logger.Info(fmt.Sprintf("Database table [%s.%s] row counts query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	if totalRowCount == 0 {
@@ -489,7 +483,7 @@ ORDER BY
 				for _, p := range pkColumns {
 					for k, v := range values {
 						if strings.EqualFold(p, k) {
-							pkValues = append(pkValues, fmt.Sprintf(`%v`, v.(int)))
+							pkValues = append(pkValues, fmt.Sprintf(`%v`, decimal.NewFromFloat(v.(float64)).String()))
 						}
 					}
 				}
@@ -565,9 +559,9 @@ ORDER BY
 
 			var columnVals []string
 			for _, i := range indexColumns {
-				for k, v := range values["index_vals"].(map[string]string) {
+				for k, v := range values["index_vals"].(map[string]interface{}) {
 					if strings.EqualFold(i, k) {
-						columnVals = append(columnVals, fmt.Sprintf("'%s'", v))
+						columnVals = append(columnVals, fmt.Sprintf("'%v'", v.(string)))
 					}
 				}
 			}
@@ -664,7 +658,7 @@ GROUP BY
 		return nil, fmt.Errorf("the database table [%s.%s] not found index [%s]", t.DbName, t.TableName, indexName)
 	}
 
-	if strings.EqualFold(resource, "database") {
+	if strings.EqualFold(resource, "server") {
 		var (
 			indDistValues [][]string
 			regionCounts  float64
@@ -786,12 +780,16 @@ GROUP BY
 	}
 
 	// get region segmentation boundary value by paginate sql
-	queryStr = fmt.Sprintf(`SELECT
-	%[1]s 
-FROM
-	( SELECT %[1]s, ROW_NUMBER ( ) OVER ( ORDER BY %[1]s ) AS RowNumber FROM ( SELECT DISTINCT %[1]s FROM %[2]s ) AS S ) AS T 
-WHERE
-	RowNumber %% %[3]d = 1`, indColumns, fmt.Sprintf("`%s`.`%s`", t.DbName, t.TableName), int(step))
+	if step == 1 {
+		queryStr = fmt.Sprintf(`SELECT DISTINCT %[1]s FROM %[2]s`, indColumns, fmt.Sprintf("`%s`.`%s`", t.DbName, t.TableName))
+	} else {
+		queryStr = fmt.Sprintf(`SELECT
+		%[1]s 
+	FROM
+		( SELECT %[1]s, ROW_NUMBER ( ) OVER ( ORDER BY %[1]s ) AS RowNumber FROM ( SELECT DISTINCT %[1]s FROM %[2]s ) AS S ) AS T 
+	WHERE
+		RowNumber %% %[3]d = 1`, indColumns, fmt.Sprintf("`%s`.`%s`", t.DbName, t.TableName), int(step))
+	}
 	tableInfo.appendSql(queryStr)
 
 	var indDistValues [][]string
@@ -874,9 +872,9 @@ func (t *Task) calculateRegions(ctx context.Context, tableInfo *TableInfo, estim
 	return regionCounts, nil
 }
 
-func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB, newTable, newIndex string, estimateRow, estimateSize, concurrency, regionSize int) (*TableInfo, error) {
+func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB, newTable, newIndex string, estimateSize, concurrency, regionSize int) (*TableInfo, error) {
 	startTime := time.Now()
-	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split sampling sql start...", t.DbName, t.TableName))
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split estimate sql start...", t.DbName, t.TableName))
 
 	if err := t.Init(); err != nil {
 		return nil, err
@@ -902,7 +900,6 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 	//%s
 	//FROM
 	//%s.%s`, columnName, dbName, tableName)
-
 	// database sql not distinct, so need unique
 	queryStr := fmt.Sprintf("SELECT %s FROM `%s`.`%s`", columns, t.DbName, t.TableName)
 	tableInfo.Sqls = append(tableInfo.Sqls, queryStr)
@@ -921,80 +918,40 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 	sortConVals = con.SortList()
 	logger.Info(fmt.Sprintf("Database table [%s.%s] sort and deduplication esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
-	queryTime = time.Now()
 	sortConValCounts := len(sortConVals)
-	// calculate the number of distinct values ​​for each based on the estimated number of rows written
-	columnDataCounts := math.Ceil(float64(estimateRow) / float64(sortConValCounts))
-
-	// fill the estimate table rows， approximately equal to estimateTableRows
-	var (
-		colsInfo          [][]string
-		splitColsInfoNums int
-	)
-	// split array
-	splitColsInfoNums = int(math.Ceil(float64(sortConValCounts) / float64(concurrency)))
-	colsInfo = make([][]string, splitColsInfoNums)
-	// paginate offset
-	offset := 0
-	for i := 0; i < splitColsInfoNums; i++ {
-		colsInfo[i] = append(colsInfo[i], stringutil.Paginate(sortConVals, offset, concurrency)...)
-		offset = offset + concurrency
+	if sortConValCounts == 0 {
+		cost := time.Since(startTime).Seconds()
+		tableInfo.Cost = cost
+		logger.Info(fmt.Sprintf("Database table [%s.%s] generate split estimate sql finished in %fs", t.DbName, t.TableName, cost))
+		return tableInfo, fmt.Errorf("the database table [%s.%s] columns [%s] values can not empty, please configure another column", t.DbName, t.TableName, columns)
 	}
 	logger.Info(fmt.Sprintf("Database table [%s.%s] query esitmate column value counts [%d] finished in %fs", t.DbName, t.TableName, sortConValCounts, time.Since(queryTime).Seconds()))
-	logger.Info(fmt.Sprintf("Database table [%s.%s] split paginate esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
-	// store column values include repeat(fill)
-	queryTime = time.Now()
-	ca := stringutil.NewConcurrentArray()
-
-	g, _ := errgroup.WithContext(ctx)
-	g.SetLimit(concurrency)
-	for _, col := range colsInfo {
-		c := col
-		g.Go(func() error {
-			ca.Append(c)
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	logger.Info(fmt.Sprintf("Database table [%s.%s] generate new estimate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
-
-	// resort newColumnVals order by asc
-	queryTime = time.Now()
-	var newColumnVals []string
-	for _, c := range ca.All() {
-		newColumnVals = append(newColumnVals, c.([]string)...)
-	}
-	sortutil.Strings(newColumnVals)
-	logger.Info(fmt.Sprintf("Database table [%s.%s] sort new esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
-
-	queryTime = time.Now()
-	// determine whether the sorted value is equal to before
-	totalCols := len(sortConVals) * int(columnDataCounts)
-	newColumnsCounts := len(newColumnVals)
-	if newColumnsCounts != totalCols {
-		return nil, fmt.Errorf("the database table [%s.%s] sort new column value counts [%d] is not equal to estimate column value counts [%d]", t.DbName, t.TableName, newColumnsCounts, totalCols)
-	}
 	// estimate split region numbers - counts
+	queryTime = time.Now()
 	regionCounts := math.Ceil(float64(estimateSize) / float64(regionSize))
+	logger.Info(fmt.Sprintf("Database table [%s.%s] calculate split region counts [%2.f] finished in %fs", t.DbName, t.TableName, regionCounts, time.Since(queryTime).Seconds()))
 
+	var oneRegionStep float64
 	// rounded up, for example: 2.5 = 3
 	// get avg one region store how much table rows data
-	oneRegionStep := math.Ceil(float64(newColumnsCounts) / regionCounts)
+	queryTime = time.Now()
+	if sortConValCounts <= int(regionCounts) {
+		oneRegionStep = 1
+	} else {
+		oneRegionStep = math.Ceil(float64(sortConValCounts) / regionCounts)
+	}
+	logger.Info(fmt.Sprintf("Database table [%s.%s] calculate region step [%2.f] finished in %fs", t.DbName, t.TableName, oneRegionStep, time.Since(queryTime).Seconds()))
 
 	// split array by segments
-	splitNums := math.Ceil(float64(newColumnsCounts) / oneRegionStep)
-
-	logger.Info(fmt.Sprintf("Database table [%s.%s] generate new estimate column value counts [%d] finished in %fs", t.DbName, t.TableName, newColumnsCounts, time.Since(queryTime).Seconds()))
-
-	logger.Info(fmt.Sprintf("Database table [%s.%s] estimate new region counts [%f] region step [%f] split nums [%f] finished in %fs", t.DbName, t.TableName, regionCounts, oneRegionStep, splitNums, time.Since(queryTime).Seconds()))
+	queryTime = time.Now()
+	splitNums := math.Ceil(float64(sortConValCounts) / oneRegionStep)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] calculate esitmate column split nums [%2.f] finished in %fs", t.DbName, t.TableName, splitNums, time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	var splitRegionInfos []string
 	// paginate offset
-	offset = 0
+	offset := 0
 	for i := 0; i < int(splitNums); i++ {
 		// take the first value in each array, that ie used to region start key
 		// for example:
@@ -1003,7 +960,7 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 		// [6 7 8]
 		// would get 1、4、6
 		// finally splicing split table index sql
-		splitRegionInfos = append(splitRegionInfos, stringutil.Paginate(newColumnVals, offset, int(oneRegionStep))[0])
+		splitRegionInfos = append(splitRegionInfos, stringutil.Paginate(sortConVals, offset, int(oneRegionStep))[0])
 		offset = offset + int(oneRegionStep)
 	}
 	logger.Info(fmt.Sprintf("Database table [%s.%s] generate new region start_key column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))

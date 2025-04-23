@@ -250,6 +250,9 @@ func (a *AppSplitSampling) Cmd() *cobra.Command {
 			if a.estimateRows == 0 {
 				return fmt.Errorf("the sampling command flag [--estimate-row] cannot be zero, please configure and retry")
 			}
+			if a.newDbName == "" {
+				a.newDbName = a.database
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -330,7 +333,6 @@ type AppSplitEstimate struct {
 	newDbName    string
 	newTableName string
 	newIndexName string
-	estimateRows int
 	estimateSize int
 	regionSize   int
 }
@@ -349,16 +351,16 @@ func (a *AppSplitEstimate) Cmd() *cobra.Command {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
 			if len(a.tables) > 1 {
-				return fmt.Errorf(`the sampling command only used for a certain table or index in a certain database. flag --tables cannot configure multiple tables`)
+				return fmt.Errorf(`the estimate command only used for a certain table or index in a certain database. flag --tables cannot configure multiple tables`)
 			}
 			if a.newTableName == "" && len(a.tables) == 1 {
 				a.newTableName = a.tables[0]
 			}
-			if a.estimateRows == 0 {
-				return fmt.Errorf("the sampling command flag [--estimate-row] cannot be zero, please configure and retry")
-			}
 			if a.estimateSize == 0 {
-				return fmt.Errorf("the sampling command flag [--estimate-size] cannot be zero, please configure and retry")
+				return fmt.Errorf("the estimate command flag [--estimate-size] cannot be zero, please configure and retry")
+			}
+			if a.newDbName == "" {
+				a.newDbName = a.database
 			}
 			return nil
 		},
@@ -395,7 +397,6 @@ func (a *AppSplitEstimate) Cmd() *cobra.Command {
 						NewDbName:    a.newDbName,
 						NewTableName: a.newTableName,
 						NewIndexName: a.newIndexName,
-						EstimateRows: a.estimateRows,
 						EstimateSize: a.estimateSize,
 						RegionSize:   a.regionSize,
 						Command:      "ESTIMATE",
@@ -427,11 +428,9 @@ func (a *AppSplitEstimate) Cmd() *cobra.Command {
 	cmd.Flags().StringVar(&a.newDbName, "new-db", a.database, "configure the generate split index statement database name, the default is the same as the original database name")
 	cmd.Flags().StringVar(&a.newTableName, "new-table", "", "configure the generate split index statement table name, the default is the same as the original table name")
 	cmd.Flags().StringVar(&a.newIndexName, "new-index", "", "configure the generate split index statement index name, the default is the same as the original index name")
-	cmd.Flags().IntVar(&a.estimateRows, "estimate-row", 0, "configure the generate split index statement estimate write rows, cannot be zero")
 	cmd.Flags().IntVar(&a.estimateSize, "estimate-size", 0, "configure the generate split index statement estimate write size（size: MB）, cannot be zero")
 	cmd.Flags().IntVar(&a.regionSize, "region-size", 96, "configure a single region size to estimate how many regions to generate（size: MB）")
 	cmd.MarkFlagRequired("columns")
-	cmd.MarkFlagRequired("estimate-row")
 	cmd.MarkFlagRequired("estimate-size")
 	cmd.MarkFlagRequired("new-index")
 	return cmd
