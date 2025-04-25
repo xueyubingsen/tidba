@@ -68,6 +68,7 @@ func NewClusterCreateModel() clusterCreateModel {
 	ti.SetHeight(30)
 	ti.ShowLineNumbers = false
 	ti.SetValue(c.String()) // setted origin template
+	ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
 	ti.Focus()
 
 	sp := spinner.New()

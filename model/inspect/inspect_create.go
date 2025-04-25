@@ -46,6 +46,7 @@ func NewInspectCreateModel(clusterName string) InspectCreateModel {
 	ti.ShowLineNumbers = false
 	ti.CharLimit = 0                                     // no length limit
 	ti.SetValue(DefaultInspectConfigTemplate().String()) // setted origin template
+	ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
 	ti.Focus()
 
 	sp := spinner.New()
