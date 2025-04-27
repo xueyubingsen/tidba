@@ -87,7 +87,7 @@ func (a *AppClusterInspectCreate) Cmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p := tea.NewProgram(inspect.NewInspectCreateModel(a.clusterName))
+			p := tea.NewProgram(inspect.NewInspectCreateModel(a.clusterName), tea.WithAltScreen())
 			teaModel, err := p.Run()
 			if err != nil {
 				return err

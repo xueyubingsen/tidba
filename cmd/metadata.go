@@ -67,7 +67,7 @@ func (a *AppMetaCreate) Cmd() *cobra.Command {
 		Short: "create the cluster metadata",
 		Long:  "Create the configuration information required for cluster access",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p := tea.NewProgram(model.NewClusterCreateModel())
+			p := tea.NewProgram(model.NewClusterCreateModel(), tea.WithAltScreen())
 			if _, err := p.Run(); err != nil {
 				return err
 			}
