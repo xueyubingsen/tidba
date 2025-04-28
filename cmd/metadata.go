@@ -16,7 +16,9 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
@@ -55,6 +57,7 @@ func (a *AppMeta) Cmd() *cobra.Command {
 
 type AppMetaCreate struct {
 	*AppMeta
+	file string
 }
 
 func (a *AppMeta) AppMetaCreate() Cmder {
@@ -67,6 +70,18 @@ func (a *AppMetaCreate) Cmd() *cobra.Command {
 		Short: "create the cluster metadata",
 		Long:  "Create the configuration information required for cluster access",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if a.file != "" {
+				jsonF, err := os.ReadFile(a.file)
+				if err != nil {
+					return err
+				}
+				content, err := model.MetadataCreate(context.Background(), string(jsonF))
+				if err != nil {
+					return err
+				}
+				fmt.Printf("cluster config content:\n%s\n\n", content)
+				return nil
+			}
 			p := tea.NewProgram(model.NewClusterCreateModel(), tea.WithAltScreen())
 			if _, err := p.Run(); err != nil {
 				return err
@@ -77,6 +92,7 @@ func (a *AppMetaCreate) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
+	cmd.Flags().StringVarP(&a.file, "file", "f", "", "configuration parameter file path")
 	return cmd
 }
 
@@ -135,6 +151,7 @@ func (a *AppMetaDelete) Cmd() *cobra.Command {
 
 type AppMetaUpdate struct {
 	*AppMeta
+	file string
 }
 
 func (a *AppMeta) AppMetaUpdate() Cmder {
@@ -153,7 +170,19 @@ func (a *AppMetaUpdate) Cmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p := tea.NewProgram(model.NewClusterUpdateModel(a.clusterName))
+			if a.file != "" {
+				jsonF, err := os.ReadFile(a.file)
+				if err != nil {
+					return err
+				}
+				content, err := model.MetadataUpdate(context.Background(), a.clusterName, string(jsonF))
+				if err != nil {
+					return err
+				}
+				fmt.Printf("cluster config content:\n%s\n\n", content)
+				return nil
+			}
+			p := tea.NewProgram(model.NewClusterUpdateModel(a.clusterName), tea.WithAltScreen())
 			if _, err := p.Run(); err != nil {
 				return err
 			}
@@ -163,6 +192,7 @@ func (a *AppMetaUpdate) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
+	cmd.Flags().StringVarP(&a.file, "file", "f", "", "configuration parameter file path")
 	return cmd
 }
 

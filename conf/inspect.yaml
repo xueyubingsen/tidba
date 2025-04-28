@@ -1,0 +1,74 @@
+window_minutes: 2880
+# 控制巡检哪些物理服务器
+host_ips: []
+# 参数以及变量检查可按需增加或者修改
+variables_params:
+    max_execution_time: 60000
+    sql_require_primary_key: "on"
+    tidb_ddl_enable_fast_reorg: "OFF"
+    tidb_distsql_scan_concurrency: 20
+    tidb_enable_rate_limit_action: "off"
+    tidb_gc_life_time: 2h
+    tidb_mem_quota_query: 104857600
+    tidb_opt_fix_control: 44262:ON
+    tidb_prepared_plan_cache_memory_guard_ratio: 0.1
+    tidb_prepared_plan_cache_size: 100
+    tidb_scatter_region: "on"
+    tidb_tmp_table_max_size: 134217728
+tidb_config_params:
+    instance.tidb_slow_log_threshold: 2000
+    log.file.max-backups: 150
+    log.file.max-days: 30
+    log.file.max-size: 300
+    log.level: info
+    log.slow-threshold: 2000
+    max-index-length: 12000
+    max_connections: 2000
+    new_collations_enabled_on_first_bootstrap: false
+    performance.max-procs: 20
+    performance.max-txn-ttl: 3600000
+    table-column-count-limit: 4096
+    tmp-storage-quota: 53687091200
+pd_config_params:
+    log.file.max-backups: 150
+    log.file.max-days: 30
+    log.file.max-size: 300
+    replication.location-labels: zone,host
+tikv_config_params:
+    log.enable-timestamp: true
+    log.file.max-backups: 150
+    log.file.max-days: 30
+    log.file.max-size: 300
+    log.format: text
+    log.level: info
+    pessimistic-txn.in-memory: false
+    pessimistic-txn.pipelined: false
+    raftstore.apply-max-batch-size: 1024
+    raftstore.apply-pool-size: 4
+    raftstore.store-pool-size: 4
+    readpool.coprocessor.use-unified-pool: true
+    readpool.storage.high-concurrency: 12
+    readpool.storage.low-concurrency: 12
+    readpool.storage.normal-concurrency: 12
+    readpool.storage.use-unified-pool: false
+    storage.block-cache.capacity: 96GiB
+modules:
+    check_hardware_info: true
+    check_software_info: true
+    check_tidb_overview: true
+    check_dev_best_practices: true
+    check_db_params: true
+    check_stats_best_practices: true
+    check_sys_config: true
+    check_crontab: true
+    check_dmesg_logs: true
+    check_db_error_logs: true
+    check_user_space: true
+    check_pd_performance: true
+    check_tidb_performance: true
+    check_tikv_performance: true
+    check_sql_order_by_elapsed_time: true
+    check_sql_order_by_tidb_cpu_time: true
+    check_sql_order_by_tikv_cpu_time: true
+    check_sql_order_by_executions: true
+    check_sql_order_by_plans: true

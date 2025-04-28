@@ -175,80 +175,88 @@ type createResultMsg struct {
 
 func submitCreateData(ctx context.Context, content string) tea.Cmd {
 	return func() tea.Msg {
-		// validate local tiup whether existed
-		if _, err := operator.IsExistedTiUPComponent(); err != nil {
-			return createResultMsg{data: content, err: err}
-		}
-		// validate required fields
-		var data *Cluster
-		if err := json.Unmarshal([]byte(content), &data); err != nil {
-			return createResultMsg{data: content, err: fmt.Errorf("invalid JSON: %w", err)}
-		}
-
-		validate := validator.New()
-		if err := validate.Struct(data); err != nil {
-			return createResultMsg{data: content, err: fmt.Errorf("validation failed: %w", err)}
-		}
-
-		db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
+		c, err := MetadataCreate(ctx, content)
 		if err != nil {
-			return createResultMsg{data: content, err: fmt.Errorf("invalid cluster [%s] database connector: %v", database.DefaultSqliteClusterName, err)}
+			return createResultMsg{data: c, err: err}
 		}
-		c, err := db.(*sqlite.Database).GetCluster(ctx, data.ClusterName)
-		if err != nil {
-			return createResultMsg{data: content, err: err}
-		}
-
-		if reflect.DeepEqual(c, &sqlite.Cluster{}) {
-			// validate cluster existed
-			// automatically fill in path and privateKey path
-			metaC, err := operator.GetDeployedClusterList(data.ClusterName)
-			if err != nil {
-				return createResultMsg{data: content, err: err}
-			}
-			// automatically determine whether the host and port are empty.
-			// If they are empty, get the first tidb server address from the topology.
-			topo, err := operator.GetDeployedClusterTopology(data.ClusterName)
-			if err != nil {
-				return createResultMsg{data: content, err: err}
-			}
-			insts, err := topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB)
-			if err != nil {
-				return createResultMsg{data: content, err: err}
-			}
-
-			var (
-				host string
-				port uint64
-			)
-			host = data.DbHost
-			port = data.DbPort
-			if host == "" {
-				host = insts[0].Host
-			}
-			if port == 0 {
-				port = insts[0].Port
-			}
-
-			newData, err := db.(*sqlite.Database).CreateCluster(ctx, &sqlite.Cluster{
-				ClusterName: data.ClusterName,
-				DbUser:      data.DbUser,
-				DbPassword:  data.DbPassword,
-				DbHost:      host,
-				DbPort:      port,
-				DbCharset:   data.DbCharset,
-				ConnParams:  data.ConnParams,
-				Path:        metaC.Path,
-				PrivateKey:  metaC.PrivateKey,
-				Entity: &sqlite.Entity{
-					Comment: data.Comment,
-				},
-			})
-			if err != nil {
-				return createResultMsg{data: content, err: err}
-			}
-			return createResultMsg{data: newData.String(), err: nil}
-		}
-		return createResultMsg{data: content, err: fmt.Errorf("the cluster name [%s] is repeated", c.ClusterName)}
+		return createResultMsg{data: c, err: nil}
 	}
+}
+
+func MetadataCreate(ctx context.Context, content string) (string, error) {
+	// validate local tiup whether existed
+	if _, err := operator.IsExistedTiUPComponent(); err != nil {
+		return "", err
+	}
+	// validate required fields
+	var data *Cluster
+	if err := json.Unmarshal([]byte(content), &data); err != nil {
+		return "", fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(data); err != nil {
+		return "", fmt.Errorf("validation failed: %w", err)
+	}
+
+	db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
+	if err != nil {
+		return "", fmt.Errorf("invalid cluster [%s] database connector: %v", database.DefaultSqliteClusterName, err)
+	}
+	c, err := db.(*sqlite.Database).GetCluster(ctx, data.ClusterName)
+	if err != nil {
+		return "", err
+	}
+
+	if reflect.DeepEqual(c, &sqlite.Cluster{}) {
+		// validate cluster existed
+		// automatically fill in path and privateKey path
+		metaC, err := operator.GetDeployedClusterList(data.ClusterName)
+		if err != nil {
+			return "", err
+		}
+		// automatically determine whether the host and port are empty.
+		// If they are empty, get the first tidb server address from the topology.
+		topo, err := operator.GetDeployedClusterTopology(data.ClusterName)
+		if err != nil {
+			return "", err
+		}
+		insts, err := topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB)
+		if err != nil {
+			return "", err
+		}
+
+		var (
+			host string
+			port uint64
+		)
+		host = data.DbHost
+		port = data.DbPort
+		if host == "" {
+			host = insts[0].Host
+		}
+		if port == 0 {
+			port = insts[0].Port
+		}
+
+		newData, err := db.(*sqlite.Database).CreateCluster(ctx, &sqlite.Cluster{
+			ClusterName: data.ClusterName,
+			DbUser:      data.DbUser,
+			DbPassword:  data.DbPassword,
+			DbHost:      host,
+			DbPort:      port,
+			DbCharset:   data.DbCharset,
+			ConnParams:  data.ConnParams,
+			Path:        metaC.Path,
+			PrivateKey:  metaC.PrivateKey,
+			Entity: &sqlite.Entity{
+				Comment: data.Comment,
+			},
+		})
+		if err != nil {
+			return "", err
+		}
+		return newData.String(), nil
+	}
+	return content, fmt.Errorf("the cluster name [%s] is repeated", c.ClusterName)
 }

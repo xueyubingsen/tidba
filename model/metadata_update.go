@@ -269,44 +269,74 @@ type editResultMsg struct {
 
 func submitEditData(ctx context.Context, clusterName string, content string) tea.Cmd {
 	return func() tea.Msg {
-		// validate required fields
-		var data *NewCluster
-		if err := json.Unmarshal([]byte(content), &data); err != nil {
-			return editResultMsg{data: content, err: fmt.Errorf("invalid JSON: %w", err)}
+		strs, err := MetadataUpdate(ctx, clusterName, content)
+		if err != nil {
+			return editResultMsg{data: strs, err: err}
 		}
+		return editResultMsg{data: strs, err: nil}
+	}
+}
 
-		data.ClusterName = clusterName
+func MetadataUpdate(ctx context.Context, clusterName string, content string) (string, error) {
+	// validate required fields
+	var data *NewCluster
+	if err := json.Unmarshal([]byte(content), &data); err != nil {
+		return "", fmt.Errorf("invalid JSON: %w", err)
+	}
 
-		validate := validator.New()
-		if err := validate.Struct(data); err != nil {
-			return editResultMsg{data: content, err: fmt.Errorf("validation failed: %w", err)}
-		}
+	data.ClusterName = clusterName
 
-		if data.ClusterName != filepath.Base(filepath.Clean(data.Path)) {
-			return editResultMsg{data: content, err: fmt.Errorf("make sure that the cluster name is consistent with the cluster name directory name of the .tiup metadata directory")}
-		}
+	if data.Path == "" || data.PrivateKey == "" {
+		var (
+			err error
+		)
 
 		db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
 		if err != nil {
-			return editResultMsg{data: content, err: fmt.Errorf("invalid cluster [%s] database connector: %v", database.DefaultSqliteClusterName, err)}
+			return "", fmt.Errorf("invalid cluster [%s] database connector: %v", database.DefaultSqliteClusterName, err)
 		}
-		newData, err := db.(*sqlite.Database).CreateCluster(ctx, &sqlite.Cluster{
-			ClusterName: data.ClusterName,
-			DbUser:      data.DbUser,
-			DbPassword:  data.DbPassword,
-			DbHost:      data.DbHost,
-			DbPort:      data.DbPort,
-			DbCharset:   data.DbCharset,
-			ConnParams:  data.ConnParams,
-			Path:        data.Path,
-			PrivateKey:  data.PrivateKey,
-			Entity: &sqlite.Entity{
-				Comment: data.Comment,
-			},
-		})
+
+		c, err := db.(*sqlite.Database).GetCluster(ctx, clusterName)
 		if err != nil {
-			return editResultMsg{data: content, err: err}
+			return "", err
 		}
-		return editResultMsg{data: newData.String(), err: nil}
+		if !reflect.DeepEqual(c, &sqlite.Cluster{}) {
+			data.Path = c.Path
+			data.PrivateKey = c.PrivateKey
+		} else {
+			return "", fmt.Errorf("the cluster_name [%s] not found, please use command [meta list] to check whether the cluster [%s] exists. if not, you can create it by using command [meta create] create", clusterName, clusterName)
+		}
 	}
+
+	validate := validator.New()
+	if err := validate.Struct(data); err != nil {
+		return "", fmt.Errorf("validation failed: %w", err)
+	}
+
+	if data.ClusterName != filepath.Base(filepath.Clean(data.Path)) {
+		return "", fmt.Errorf("make sure that the cluster name is consistent with the cluster name directory name of the .tiup metadata directory")
+	}
+
+	db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
+	if err != nil {
+		return "", fmt.Errorf("invalid cluster [%s] database connector: %v", database.DefaultSqliteClusterName, err)
+	}
+	newData, err := db.(*sqlite.Database).CreateCluster(ctx, &sqlite.Cluster{
+		ClusterName: data.ClusterName,
+		DbUser:      data.DbUser,
+		DbPassword:  data.DbPassword,
+		DbHost:      data.DbHost,
+		DbPort:      data.DbPort,
+		DbCharset:   data.DbCharset,
+		ConnParams:  data.ConnParams,
+		Path:        data.Path,
+		PrivateKey:  data.PrivateKey,
+		Entity: &sqlite.Entity{
+			Comment: data.Comment,
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return newData.String(), nil
 }

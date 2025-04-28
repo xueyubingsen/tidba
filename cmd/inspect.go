@@ -65,6 +65,7 @@ func (a *AppInspect) Cmd() *cobra.Command {
 
 type AppClusterInspectCreate struct {
 	*AppInspect
+	file string
 }
 
 func (a *AppInspect) AppClusterInspectCreate() Cmder {
@@ -87,6 +88,15 @@ func (a *AppClusterInspectCreate) Cmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if a.file != "" {
+				content, err := inspect.YamlFileCreate(context.Background(), a.clusterName, a.file)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("cluster ispection config content:\n%s", content)
+				return nil
+			}
+
 			p := tea.NewProgram(inspect.NewInspectCreateModel(a.clusterName), tea.WithAltScreen())
 			teaModel, err := p.Run()
 			if err != nil {
@@ -106,6 +116,7 @@ func (a *AppClusterInspectCreate) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
+	cmd.Flags().StringVarP(&a.file, "file", "f", "", "configuration parameter file path")
 	return cmd
 }
 
@@ -170,6 +181,7 @@ func (a *AppClusterInspectDelete) Cmd() *cobra.Command {
 
 type AppClusterInspectUpdate struct {
 	*AppInspect
+	file string
 }
 
 func (a *AppInspect) AppClusterInspectUpdate() Cmder {
@@ -192,7 +204,16 @@ func (a *AppClusterInspectUpdate) Cmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p := tea.NewProgram(inspect.NewInspectUpdateModel(a.clusterName))
+			if a.file != "" {
+				content, err := inspect.YamlFileCreate(context.Background(), a.clusterName, a.file)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("cluster ispection config content:\n%s", content)
+				return nil
+			}
+
+			p := tea.NewProgram(inspect.NewInspectUpdateModel(a.clusterName), tea.WithAltScreen())
 			teaModel, err := p.Run()
 			if err != nil {
 				return err
@@ -210,6 +231,7 @@ func (a *AppClusterInspectUpdate) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
+	cmd.Flags().StringVarP(&a.file, "file", "f", "", "configuration parameter file path")
 	return cmd
 }
 

@@ -1,0 +1,10 @@
+{                                     
+  "clusterName": "",                   
+  "dbUser": "",                        
+  "dbPassword": "",                    
+  "dbHost": "",                        
+  "dbPort": 0,                         
+  "dbCharset": "utf8mb4",              
+  "connParams": "",                    
+  "comment": ""                        
+}  

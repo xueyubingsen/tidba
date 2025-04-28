@@ -50,6 +50,8 @@ jobs:
           
           sudo cp -r ${{ github.workspace }}/README.md ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
 
+          sudo cp -r ${{ github.workspace }}/conf/* ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
+
           cd ${{ github.workspace }}/build
           pwd
           sudo tar -zcvf tidba-${{ github.ref_name }}-linux-amd64.tar.gz tidba-${{ github.ref_name }}-linux-amd64/
@@ -64,6 +66,8 @@ jobs:
           sudo mv ${{ github.workspace }}/linux/arm64/tidba ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
           
           sudo cp -r ${{ github.workspace }}/README.md ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-arm64
+
+          sudo cp -r ${{ github.workspace }}/conf/* ${{ github.workspace }}/build/tidba-${{ github.ref_name }}-linux-amd64
 
           cd ${{ github.workspace }}/build
           pwd

@@ -18,6 +18,7 @@ package inspect
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/sqlite"
@@ -154,24 +155,43 @@ type inspCreateResultMsg struct {
 
 func submitInspCreateData(ctx context.Context, clusterName, content string) tea.Cmd {
 	return func() tea.Msg {
-		// validate required fields
-		var data *InspectConfig
-		if err := yaml.Unmarshal([]byte(content), &data); err != nil {
-			return inspCreateResultMsg{data: content, err: fmt.Errorf("invalid YAML: %w", err)}
-		}
-
-		db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
-		if err != nil {
-			return inspCreateResultMsg{data: content, err: fmt.Errorf("invalid cluster [%s] database connector: %v", database.DefaultSqliteClusterName, err)}
-		}
-
-		_, err = db.(*sqlite.Database).CreateInspect(ctx, &sqlite.Inspect{
-			ClusterName:   clusterName,
-			InspectConfig: data.String(),
-		})
-		if err != nil {
+		if err := createInspect(ctx, clusterName, content); err != nil {
 			return inspCreateResultMsg{data: content, err: err}
 		}
 		return inspCreateResultMsg{data: content, err: nil}
 	}
+}
+
+func YamlFileCreate(ctx context.Context, clusterName, file string) (string, error) {
+	yamlFile, err := os.ReadFile(file)
+	if err != nil {
+		return "", err
+	}
+	yamlC := string(yamlFile)
+	if err := createInspect(ctx, clusterName, yamlC); err != nil {
+		return "", err
+	}
+	return yamlC, nil
+}
+
+func createInspect(ctx context.Context, clusterName, content string) error {
+	// validate required fields
+	var data *InspectConfig
+	if err := yaml.Unmarshal([]byte(content), &data); err != nil {
+		return fmt.Errorf("invalid YAML: %w", err)
+	}
+
+	db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
+	if err != nil {
+		return fmt.Errorf("invalid cluster [%s] database connector: %v", database.DefaultSqliteClusterName, err)
+	}
+
+	_, err = db.(*sqlite.Database).CreateInspect(ctx, &sqlite.Inspect{
+		ClusterName:   clusterName,
+		InspectConfig: data.String(),
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
