@@ -145,7 +145,6 @@ func (a *AppSqlDisplay) Cmd() *cobra.Command {
 					fmt.Printf("\n------\n")
 					fmt.Printf("MAX PLAN: %s\n", p.MaxPlan.PlanDigest)
 					fmt.Println(p.MaxPlan.SqlText + "\n")
-					fmt.Println()
 					fmt.Println(p.MaxPlan.SqlPlan + "\n")
 				}
 			}

@@ -173,7 +173,11 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 		schemaName := sli[1]
 
 		planDetail.SampleUser = sampleUser
-		planDetail.SchemaName = schemaName
+		if schemaName == "NULLABLE" {
+			planDetail.SchemaName = "NULL"
+		} else {
+			planDetail.SchemaName = schemaName
+		}
 
 		var minPlanbs strings.Builder
 		minPlanbs.WriteString(`SELECT
@@ -197,8 +201,12 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 		AND sub_min.summary_end_time >= '%s'
 		AND sub_min.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, end, start) + "\n")
 		}
-		minPlanbs.WriteString(fmt.Sprintf("AND sub_min.digest = '%s' AND sub_min.sample_user = '%s' AND sub_min.schema_name = '%s' ORDER BY sub_min.min_latency ASC LIMIT 1", sqlDigest, sampleUser, schemaName))
-
+		minPlanbs.WriteString(fmt.Sprintf("AND sub_min.digest = '%s' AND sub_min.sample_user = '%s'", sqlDigest, sampleUser))
+		if schemaName == "NULLABLE" {
+			minPlanbs.WriteString(" AND sub_min.schema_name IS NULL ORDER BY sub_min.min_latency ASC LIMIT 1")
+		} else {
+			minPlanbs.WriteString(fmt.Sprintf(" AND sub_min.schema_name = '%s' ORDER BY sub_min.min_latency ASC LIMIT 1", schemaName))
+		}
 		_, res, err = db.GeneralQuery(ctx, minPlanbs.String())
 		if err != nil {
 			return nil, err
@@ -234,7 +242,12 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 		AND sub_max.summary_end_time >= '%s'
 		AND sub_max.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, end, start) + "\n")
 		}
-		maxPlanbs.WriteString(fmt.Sprintf("AND sub_max.digest = '%s' AND sub_max.sample_user = '%s' AND sub_max.schema_name = '%s' ORDER BY sub_max.max_latency DESC LIMIT 1", sqlDigest, sampleUser, schemaName))
+		maxPlanbs.WriteString(fmt.Sprintf("AND sub_max.digest = '%s' AND sub_max.sample_user = '%s'", sqlDigest, sampleUser))
+		if schemaName == "NULLABLE" {
+			maxPlanbs.WriteString(" AND sub_max.schema_name IS NULL ORDER BY sub_max.max_latency DESC LIMIT 1")
+		} else {
+			maxPlanbs.WriteString(fmt.Sprintf(" AND sub_max.schema_name = '%s' ORDER BY sub_max.max_latency DESC LIMIT 1", schemaName))
+		}
 
 		_, res, err = db.GeneralQuery(ctx, maxPlanbs.String())
 		if err != nil {
@@ -286,6 +299,9 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 
 		for _, r := range res {
 			var p []interface{}
+			if r["schema_name"] == "NULLABLE" {
+				r["schema_name"] = "NULL"
+			}
 			p = append(p, fmt.Sprintf("%s[%s]", r["sample_user"], r["schema_name"]))
 			p = append(p, r["plan_digests"])
 			p = append(p, fmt.Sprintf("%s[%s]", r["min_latency_s"], minPlanDigest))
@@ -425,7 +441,7 @@ Avg processed keys：Coprocessor 处理的 key 的平均数量。相比 avg_tota
 
 func PrintSqlDisplayTrendSummaryComment(trend int) {
 	fmt.Println(`NOTES:`)
-	fmt.Printf("- 当前时间窗口非固定以 statement_summary refresh 周期为时间段查询(看查询条件)，而查询过往同个 SQL 执行情况以 refresh 周期为时间段，获取 %d 个时间段内对应 SQL 指纹执行信息\n", trend)
+	fmt.Printf("- 当前时间窗口非固定以 statement_summary refresh 周期为时间段查询(看查询条件)，而以 refresh 周期为时间段查询过往同个 SQL 执行情况（同比），获取 %d 个时间段内对应 SQL 指纹执行信息\n", trend)
 }
 
 func PrintSqlDisplayPlanSummaryComment() {
