@@ -30,23 +30,24 @@ import (
 )
 
 type TopsqlQueryModel struct {
-	ctx              context.Context
-	cancel           context.CancelFunc
-	clusterName      string
-	nearly           int
-	enableHistory    bool
-	enableSqlDisplay bool
-	startTime        string
-	endTime          string
-	top              int
-	command          string
-	concurrency      int
-	component        string
-	spinner          spinner.Model
-	instances        []string
-	mode             string
-	Msgs             interface{}
-	Error            error
+	ctx               context.Context
+	cancel            context.CancelFunc
+	clusterName       string
+	nearly            int
+	enableHistory     bool
+	enableSqlDisplay  bool
+	enableConnDisplay bool
+	startTime         string
+	endTime           string
+	top               int
+	command           string
+	concurrency       int
+	component         string
+	spinner           spinner.Model
+	instances         []string
+	mode              string
+	Msgs              interface{}
+	Error             error
 }
 
 func NewTopsqlQueryModel(clusterName string, nearly int,
@@ -58,6 +59,7 @@ func NewTopsqlQueryModel(clusterName string, nearly int,
 	concurrency int,
 	component string,
 	enableSqlDisplay bool,
+	enableConnDisplay bool,
 	instances []string,
 ) TopsqlQueryModel {
 	sp := spinner.New()
@@ -67,21 +69,22 @@ func NewTopsqlQueryModel(clusterName string, nearly int,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return TopsqlQueryModel{
-		ctx:              ctx,
-		cancel:           cancel,
-		spinner:          sp,
-		clusterName:      clusterName,
-		nearly:           nearly,
-		enableHistory:    enableHistory,
-		startTime:        startTime,
-		endTime:          endTime,
-		top:              top,
-		command:          command,
-		concurrency:      concurrency,
-		component:        component,
-		enableSqlDisplay: enableSqlDisplay,
-		instances:        instances,
-		mode:             model.BubblesModeQuering,
+		ctx:               ctx,
+		cancel:            cancel,
+		spinner:           sp,
+		clusterName:       clusterName,
+		nearly:            nearly,
+		enableHistory:     enableHistory,
+		startTime:         startTime,
+		endTime:           endTime,
+		top:               top,
+		command:           command,
+		concurrency:       concurrency,
+		component:         component,
+		enableSqlDisplay:  enableSqlDisplay,
+		enableConnDisplay: enableConnDisplay,
+		instances:         instances,
+		mode:              model.BubblesModeQuering,
 	}
 }
 
@@ -119,32 +122,32 @@ func (m TopsqlQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ELAPSED":
 			return m, tea.Batch(
 				cmd,
-				submitElapsedData(m.ctx, m.clusterName, m.nearly, m.enableHistory, m.enableSqlDisplay, m.startTime, m.endTime, m.top), // submit list data
+				submitElapsedData(m.ctx, m.clusterName, m.nearly, m.enableHistory, m.enableSqlDisplay, m.enableConnDisplay, m.startTime, m.endTime, m.top), // submit list data
 			)
 		case "EXECUTIONS":
 			return m, tea.Batch(
 				cmd,
-				submitExecutionsData(m.ctx, m.clusterName, m.nearly, m.enableHistory, m.enableSqlDisplay, m.startTime, m.endTime, m.top), // submit list data
+				submitExecutionsData(m.ctx, m.clusterName, m.nearly, m.enableHistory, m.enableSqlDisplay, m.enableConnDisplay, m.startTime, m.endTime, m.top), // submit list data
 			)
 		case "PLANS":
 			return m, tea.Batch(
 				cmd,
-				submitPlansData(m.ctx, m.clusterName, m.nearly, m.enableHistory, m.enableSqlDisplay, m.startTime, m.endTime, m.top), // submit list data
+				submitPlansData(m.ctx, m.clusterName, m.nearly, m.enableHistory, m.enableSqlDisplay, m.enableConnDisplay, m.startTime, m.endTime, m.top), // submit list data
 			)
 		case "CPU":
 			return m, tea.Batch(
 				cmd,
-				submitCpuData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.component, m.concurrency, m.enableSqlDisplay, m.instances), // submit list data
+				submitCpuData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.component, m.concurrency, m.enableSqlDisplay, m.enableConnDisplay, m.instances), // submit list data
 			)
 		case "DIAGNOSIS":
 			return m, tea.Batch(
 				cmd,
-				submitDiagData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.concurrency, m.enableHistory, m.enableSqlDisplay), // submit list data
+				submitDiagData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.concurrency, m.enableHistory, m.enableSqlDisplay, m.enableConnDisplay), // submit list data
 			)
 		case "MEMORY":
 			return m, tea.Batch(
 				cmd,
-				submitMemoryData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.enableHistory, m.enableSqlDisplay), // submit list data
+				submitMemoryData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.enableHistory, m.enableSqlDisplay, m.enableConnDisplay), // submit list data
 			)
 		default:
 			return m, tea.Quit
@@ -181,6 +184,7 @@ type QueriedRespMsg struct {
 func submitElapsedData(ctx context.Context, clusterName string, nearly int,
 	enableHistory bool,
 	enableSqlDisplay bool,
+	enableConn bool,
 	startTime string,
 	endTime string,
 	top int) tea.Cmd {
@@ -207,6 +211,16 @@ func submitElapsedData(ctx context.Context, clusterName string, nearly int,
 			totalLatency = res[0]["all_latency_s"]
 		}
 
+		_, res, err = db.GeneralQuery(ctx, `/*+ monitoring */  select digest,count(1) as count from information_schema.cluster_processlist group by digest`)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+
+		sqlDigestCounts := make(map[string]string)
+		for _, r := range res {
+			sqlDigestCounts[r["digest"]] = r["count"]
+		}
+
 		queries, err := GenerateTopsqlElapsedTimeQuery(nearly, top, startTime, endTime, enableHistory, totalLatency)
 		if err != nil {
 			return listRespMsg{err: err}
@@ -217,8 +231,11 @@ func submitElapsedData(ctx context.Context, clusterName string, nearly int,
 			return listRespMsg{err: err}
 		}
 
-		columns := []string{"Elapsed Time(s)", "Executions", "Elap per Exec(s)", "Min query Time(s)", "Max query Time(s)", "Avg total keys", "Avg processed keys", `% Total SQL Time`, "SQL Digest"}
-
+		columns := []string{"Elapsed Time(s)"}
+		if enableConn {
+			columns = append(columns, "Connections")
+		}
+		columns = append(columns, "Executions", "Elap per Exec(s)", "Min query Time(s)", "Max query Time(s)", "Avg total keys", "Avg processed keys", `% Total SQL Time`, "SQL Digest")
 		if enableSqlDisplay {
 			columns = append(columns, "SQL Text")
 		}
@@ -247,7 +264,21 @@ func submitElapsedData(ctx context.Context, clusterName string, nearly int,
 					}
 				}
 			}
-			rows = append(rows, row)
+
+			if enableConn {
+				// get sql digest
+				sqlDigest := row[8].(string)
+				var digestCounts string
+				if count, ok := sqlDigestCounts[sqlDigest]; ok {
+					digestCounts = count
+				} else {
+					digestCounts = "0"
+				}
+
+				rows = append(rows, insertElemSlice(row, 1, digestCounts))
+			} else {
+				rows = append(rows, row)
+			}
 		}
 		return listRespMsg{msgs: &QueriedRespMsg{
 			Columns: columns,
@@ -259,6 +290,7 @@ func submitElapsedData(ctx context.Context, clusterName string, nearly int,
 func submitExecutionsData(ctx context.Context, clusterName string, nearly int,
 	enableHistory bool,
 	enableSqlDisplay bool,
+	enableConnDisplay bool,
 	startTime string,
 	endTime string,
 	top int) tea.Cmd {
@@ -285,6 +317,16 @@ func submitExecutionsData(ctx context.Context, clusterName string, nearly int,
 			totalLatency = res[0]["all_latency_s"]
 		}
 
+		_, res, err = db.GeneralQuery(ctx, `/*+ monitoring */  select digest,count(1) as count from information_schema.cluster_processlist group by digest`)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+
+		sqlDigestCounts := make(map[string]string)
+		for _, r := range res {
+			sqlDigestCounts[r["digest"]] = r["count"]
+		}
+
 		queries, err := GenerateTopsqlExecutionsQuery(nearly, top, startTime, endTime, enableHistory, totalLatency)
 		if err != nil {
 			return listRespMsg{err: err}
@@ -295,7 +337,11 @@ func submitExecutionsData(ctx context.Context, clusterName string, nearly int,
 			return listRespMsg{err: err}
 		}
 
-		columns := []string{"Executions", "Elap per Exec(s)", "Parse Per Exec(s)", "Compile Per Exec(s)", "Min query Time(s)", "Max query Time(s)", "Avg total keys", "Avg processed keys", `% Total SQL Time`, "SQL Digest"}
+		columns := []string{"Executions"}
+		if enableConnDisplay {
+			columns = append(columns, "Connections")
+		}
+		columns = append(columns, "Elap per Exec(s)", "Parse Per Exec(s)", "Compile Per Exec(s)", "Min query Time(s)", "Max query Time(s)", "Avg total keys", "Avg processed keys", `% Total SQL Time`, "SQL Digest")
 
 		if enableSqlDisplay {
 			columns = append(columns, "SQL Text")
@@ -325,7 +371,21 @@ func submitExecutionsData(ctx context.Context, clusterName string, nearly int,
 					}
 				}
 			}
-			rows = append(rows, row)
+
+			if enableConnDisplay {
+				// get sql digest
+				sqlDigest := row[9].(string)
+				var digestCounts string
+				if count, ok := sqlDigestCounts[sqlDigest]; ok {
+					digestCounts = count
+				} else {
+					digestCounts = "0"
+				}
+
+				rows = append(rows, insertElemSlice(row, 1, digestCounts))
+			} else {
+				rows = append(rows, row)
+			}
 		}
 		return listRespMsg{msgs: &QueriedRespMsg{
 			Columns: columns,
@@ -337,6 +397,7 @@ func submitExecutionsData(ctx context.Context, clusterName string, nearly int,
 func submitPlansData(ctx context.Context, clusterName string, nearly int,
 	enableHistory bool,
 	enableSqlDisplay bool,
+	enableConnDisplay bool,
 	startTime string,
 	endTime string,
 	top int) tea.Cmd {
@@ -363,6 +424,16 @@ func submitPlansData(ctx context.Context, clusterName string, nearly int,
 			totalLatency = res[0]["all_latency_s"]
 		}
 
+		_, res, err = db.GeneralQuery(ctx, `/*+ monitoring */  select digest,count(1) as count from information_schema.cluster_processlist group by digest`)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+
+		sqlDigestCounts := make(map[string]string)
+		for _, r := range res {
+			sqlDigestCounts[r["digest"]] = r["count"]
+		}
+
 		queries, err := GenerateTopsqlPlansQuery(nearly, top, startTime, endTime, enableHistory, totalLatency)
 		if err != nil {
 			return listRespMsg{err: err}
@@ -373,7 +444,11 @@ func submitPlansData(ctx context.Context, clusterName string, nearly int,
 			return listRespMsg{err: err}
 		}
 
-		columns := []string{"SQL Plans", "Elapsed Time(s)", "Executions", "Min sql Plan(s)", "Max sql Plan(s)", "Avg total keys", "Avg processed keys", `% Total SQL Time`, "SQL Digest"}
+		columns := []string{"SQL Plans"}
+		if enableConnDisplay {
+			columns = append(columns, "Connections")
+		}
+		columns = append(columns, "Elapsed Time(s)", "Executions", "Min sql Plan(s)", "Max sql Plan(s)", "Avg total keys", "Avg processed keys", `% Total SQL Time`, "SQL Digest")
 
 		if enableSqlDisplay {
 			columns = append(columns, "SQL Text")
@@ -403,7 +478,19 @@ func submitPlansData(ctx context.Context, clusterName string, nearly int,
 					}
 				}
 			}
-			rows = append(rows, row)
+			if enableConnDisplay {
+				// get sql digest
+				sqlDigest := row[8].(string)
+				var digestCounts string
+				if count, ok := sqlDigestCounts[sqlDigest]; ok {
+					digestCounts = count
+				} else {
+					digestCounts = "0"
+				}
+				rows = append(rows, insertElemSlice(row, 1, digestCounts))
+			} else {
+				rows = append(rows, row)
+			}
 		}
 
 		return listRespMsg{msgs: &QueriedRespMsg{
@@ -416,7 +503,7 @@ func submitPlansData(ctx context.Context, clusterName string, nearly int,
 func submitCpuData(ctx context.Context, clusterName string, nearly int,
 	startTime string,
 	endTime string,
-	top int, component string, concurrency int, enableSqlDisplay bool, instances []string) tea.Cmd {
+	top int, component string, concurrency int, enableSqlDisplay, enableConnDisplay bool, instances []string) tea.Cmd {
 	return func() tea.Msg {
 		connDB, err := database.Connector.GetDatabase(clusterName)
 		if err != nil {
@@ -436,11 +523,15 @@ func submitCpuData(ctx context.Context, clusterName string, nearly int,
 			return listRespMsg{err: fmt.Errorf("the dashboard topsql feature not enabled, please [SET GLOBAL tidb_enable_top_sql = 1] enabled")}
 		}
 
-		cpus, err := GenerateTosqlCpuTimeByComponentServer(ctx, clusterName, component, nearly, top, startTime, endTime, concurrency, instances)
+		cpus, err := GenerateTosqlCpuTimeByComponentServer(ctx, db, clusterName, component, nearly, top, startTime, endTime, concurrency, instances)
 		if err != nil {
 			return listRespMsg{err: err}
 		}
-		columns := []string{"CPU Time(s)", "Exec counts per sec", "Latency per exec(s)", "Scan record per sec", "Scan indexes per sec", "Plan digest counts", "Max plan sql latency(s)", "Min plan sql latency(s)", `% Total SQL Time`, "SQL Digest"}
+		columns := []string{"CPU Time(s)"}
+		if enableConnDisplay {
+			columns = append(columns, "Connections")
+		}
+		columns = append(columns, "Exec counts per sec", "Latency per exec(s)", "Scan record per sec", "Scan indexes per sec", "Plan digest counts", "Max plan sql latency(s)", "Min plan sql latency(s)", `% Total SQL Time`, "SQL Digest")
 		if enableSqlDisplay {
 			columns = append(columns, "SQL Text")
 		}
@@ -448,6 +539,9 @@ func submitCpuData(ctx context.Context, clusterName string, nearly int,
 		for _, c := range cpus {
 			var row []interface{}
 			row = append(row, c.CpuTimeSec)
+			if enableConnDisplay {
+				row = append(row, c.Connections)
+			}
 			row = append(row, c.ExecCountsPerSec)
 			row = append(row, c.LatencyPerExecSec)
 			row = append(row, c.ScanRecordPerSec)
@@ -476,7 +570,7 @@ func submitCpuData(ctx context.Context, clusterName string, nearly int,
 func submitDiagData(ctx context.Context, clusterName string, nearly int,
 	startTime string,
 	endTime string,
-	top int, concurrency int, enableHistory, enableSqlDisplay bool) tea.Cmd {
+	top int, concurrency int, enableHistory, enableSqlDisplay, enableConnDisplay bool) tea.Cmd {
 	return func() tea.Msg {
 		connDB, err := database.Connector.GetDatabase(clusterName)
 		if err != nil {
@@ -496,12 +590,26 @@ func submitDiagData(ctx context.Context, clusterName string, nearly int,
 			return listRespMsg{err: fmt.Errorf("the dashboard topsql feature not enabled, please [SET GLOBAL tidb_enable_top_sql = 1] enabled")}
 		}
 
+		_, res, err = db.GeneralQuery(ctx, `/*+ monitoring */  select digest,count(1) as count from information_schema.cluster_processlist group by digest`)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+
+		sqlDigestCounts := make(map[string]string)
+		for _, r := range res {
+			sqlDigestCounts[r["digest"]] = r["count"]
+		}
+
 		rows, err := TopsqlDiagnosis(ctx, clusterName, db, nearly, top, startTime, endTime, concurrency, enableHistory)
 		if err != nil {
 			return listRespMsg{err: err}
 		}
 
-		columns := []string{"Score", "SQL Digest", "TiKV CPUS", "TiDB CPUS", "Elapsed", "Executions", "Plans"}
+		columns := []string{"Score", "SQL Digest"}
+		if enableConnDisplay {
+			columns = append(columns, "Connections")
+		}
+		columns = append(columns, "TiKV CPUS", "TiDB CPUS", "Elapsed", "Executions", "Plans")
 		if enableSqlDisplay {
 			columns = append(columns, "SQL Text")
 		}
@@ -509,10 +617,25 @@ func submitDiagData(ctx context.Context, clusterName string, nearly int,
 		// only top 5
 		var newRows [][]interface{}
 		if len(rows) > 5 {
-			newRows = rows[:5]
-		} else {
-			newRows = rows
+			rows = rows[:5]
 		}
+
+		for _, row := range rows {
+			if enableConnDisplay {
+				// get sql digest
+				sqlDigest := row[1].(string)
+				var digestCounts string
+				if count, ok := sqlDigestCounts[sqlDigest]; ok {
+					digestCounts = count
+				} else {
+					digestCounts = "0"
+				}
+				newRows = append(newRows, insertElemSlice(row, 2, digestCounts))
+			} else {
+				newRows = append(newRows, row)
+			}
+		}
+
 		return listRespMsg{msgs: &QueriedRespMsg{
 			Columns: columns,
 			Results: newRows,
@@ -523,9 +646,9 @@ func submitDiagData(ctx context.Context, clusterName string, nearly int,
 func submitMemoryData(ctx context.Context, clusterName string, nearly int,
 	startTime string,
 	endTime string,
-	top int, enableHistory, enableSqlDisplay bool) tea.Cmd {
+	top int, enableHistory, enableSqlDisplay, enableConnDisplay bool) tea.Cmd {
 	return func() tea.Msg {
-		resps, err := TopsqlMemoryUsage(ctx, clusterName, nearly, startTime, endTime, top, enableHistory, enableSqlDisplay)
+		resps, err := TopsqlMemoryUsage(ctx, clusterName, nearly, startTime, endTime, top, enableHistory, enableSqlDisplay, enableConnDisplay)
 		if err != nil {
 			return listRespMsg{err: err}
 		}

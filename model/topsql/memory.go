@@ -36,7 +36,7 @@ const (
 	DefaultPlanCacheMsgType = "PLANCACHE"
 )
 
-func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, start, end string, top int, enableHistory bool, enableSqlDisplay bool) ([]*QueriedRespMsg, error) {
+func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, start, end string, top int, enableHistory bool, enableSqlDisplay, enableConnDisplay bool) ([]*QueriedRespMsg, error) {
 	var queriedRespMsgs []*QueriedRespMsg
 
 	connDB, err := database.Connector.GetDatabase(clusterName)
@@ -59,6 +59,17 @@ func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, star
 	} else {
 		totalLatency = res[0]["all_latency_s"]
 	}
+
+	_, res, err = db.GeneralQuery(ctx, `/*+ monitoring */  select digest,count(1) as count from information_schema.cluster_processlist group by digest`)
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDigestCounts := make(map[string]string)
+	for _, r := range res {
+		sqlDigestCounts[r["digest"]] = r["count"]
+	}
+
 	queries, err := GenerateTopsqlMemoryQuery(nearly, top, start, end, enableHistory, totalLatency)
 	if err != nil {
 		return nil, err
@@ -69,7 +80,11 @@ func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, star
 		return nil, err
 	}
 
-	columns := []string{"Memory Size(MB)", "Executions", "Mem per Exec(MB)", "Latency per Exec(s)", "Min query Time(s)", "Max query Time(s)", `% Total SQL Time`, "SQL Digest"}
+	columns := []string{"Memory Size(MB)", "Executions"}
+	if enableConnDisplay {
+		columns = append(columns, "Connections")
+	}
+	columns = append(columns, "Mem per Exec(MB)", "Latency per Exec(s)", "Min query Time(s)", "Max query Time(s)", `% Total SQL Time`, "SQL Digest")
 
 	if enableSqlDisplay {
 		columns = append(columns, "SQL Text")
@@ -99,7 +114,20 @@ func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, star
 				}
 			}
 		}
-		rows = append(rows, row)
+
+		if enableConnDisplay {
+			// get sql digest
+			sqlDigest := row[7].(string)
+			var digestCounts string
+			if count, ok := sqlDigestCounts[sqlDigest]; ok {
+				digestCounts = count
+			} else {
+				digestCounts = "0"
+			}
+			rows = append(rows, insertElemSlice(row, 2, digestCounts))
+		} else {
+			rows = append(rows, row)
+		}
 	}
 
 	queriedRespMsgs = append(queriedRespMsgs, &QueriedRespMsg{
@@ -138,6 +166,16 @@ func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, star
 		// 	Results: rows,
 		// })
 
+		_, res, err = db.GeneralQuery(ctx, `/*+ monitoring */  select digest,count(1) as count from information_schema.cluster_processlist group by digest`)
+		if err != nil {
+			return nil, err
+		}
+
+		sqlDigestCounts := make(map[string]string)
+		for _, r := range res {
+			sqlDigestCounts[r["digest"]] = r["count"]
+		}
+
 		queries, err = GenerateTopsqlMemoryExecsQuery(nearly, top, start, end, enableHistory, totalLatency, instances)
 		if err != nil {
 			return nil, err
@@ -148,7 +186,11 @@ func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, star
 			return nil, err
 		}
 
-		columns := []string{"Executions", "Elap per Exec(s)", "Parse Per Exec(s)", "Compile Per Exec(s)", "Memory Per Exec(MB)", "Min query Time(s)", "Max query Time(s)", `% Total SQL Time`, "SQL Digest"}
+		columns := []string{"Executions"}
+		if enableConnDisplay {
+			columns = append(columns, "Connections")
+		}
+		columns = append(columns, "Elap per Exec(s)", "Parse Per Exec(s)", "Compile Per Exec(s)", "Memory Per Exec(MB)", "Min query Time(s)", "Max query Time(s)", `% Total SQL Time`, "SQL Digest")
 
 		if enableSqlDisplay {
 			columns = append(columns, "SQL Text")
@@ -178,7 +220,20 @@ func TopsqlMemoryUsage(ctx context.Context, clusterName string, nearly int, star
 					}
 				}
 			}
-			newRows = append(newRows, row)
+
+			if enableConnDisplay {
+				// get sql digest
+				sqlDigest := row[8].(string)
+				var digestCounts string
+				if count, ok := sqlDigestCounts[sqlDigest]; ok {
+					digestCounts = count
+				} else {
+					digestCounts = "0"
+				}
+				newRows = append(newRows, insertElemSlice(row, 1, digestCounts))
+			} else {
+				newRows = append(newRows, row)
+			}
 		}
 
 		queriedRespMsgs = append(queriedRespMsgs, &QueriedRespMsg{

@@ -18,15 +18,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/wentaojin/tidba/database"
-	"github.com/wentaojin/tidba/database/sqlite"
 	"github.com/wentaojin/tidba/utils/stringutil"
 	"github.com/wentaojin/tidba/utils/version"
 )
@@ -87,37 +84,37 @@ func (a *App) Cmd() *cobra.Command {
 			}
 
 			// license skip Limits
-			if cmd.Use == "license" || cmd.Use == "generate" || cmd.Use == "activate" {
-				return nil
-			}
+			// if cmd.Use == "license" || cmd.Use == "generate" || cmd.Use == "activate" {
+			// 	return nil
+			// }
 
-			macAddr, err := getDefaultMACAddress()
-			if err != nil {
-				return err
-			}
-			db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
-			if err != nil {
-				return err
-			}
-			lic, err := db.(*sqlite.Database).GetLicense(context.Background(), macAddr)
-			if err != nil {
-				return err
-			}
-			if reflect.DeepEqual(lic, &sqlite.License{}) {
-				return fmt.Errorf("the software is not authorized. please use [tidba license generate --user {userName} --day {licenseDays}] to generate the authorization code, and then contact the author to obtain the authorization key to activate the software")
-			}
+			// macAddr, err := getDefaultMACAddress()
+			// if err != nil {
+			// 	return err
+			// }
+			// db, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
+			// if err != nil {
+			// 	return err
+			// }
+			// lic, err := db.(*sqlite.Database).GetLicense(context.Background(), macAddr)
+			// if err != nil {
+			// 	return err
+			// }
+			// if reflect.DeepEqual(lic, &sqlite.License{}) {
+			// 	return fmt.Errorf("the software is not authorized. please use [tidba license generate --user {userName} --day {licenseDays}] to generate the authorization code, and then contact the author to obtain the authorization key to activate the software")
+			// }
 
-			expir, err := time.ParseInLocation("2006-01-02 15:04:05", lic.ExpireTime, time.Local)
-			if err != nil {
-				return err
-			}
-			if time.Now().In(time.Local).After(expir) {
-				return fmt.Errorf("the license has expired and cannot be used, please contact the author for reactivation")
-			}
-			// verify MAC
-			if macAddr != lic.MacAddress {
-				return fmt.Errorf("the server address does not match. please use it on the original activation server")
-			}
+			// expir, err := time.ParseInLocation("2006-01-02 15:04:05", lic.ExpireTime, time.Local)
+			// if err != nil {
+			// 	return err
+			// }
+			// if time.Now().In(time.Local).After(expir) {
+			// 	return fmt.Errorf("the license has expired and cannot be used, please contact the author for reactivation")
+			// }
+			// // verify MAC
+			// if macAddr != lic.MacAddress {
+			// 	return fmt.Errorf("the server address does not match. please use it on the original activation server")
+			// }
 
 			a.history = fmt.Sprintf("%s/tidba_history", dir)
 			return nil

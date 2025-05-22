@@ -30,11 +30,12 @@ import (
 type AppTopsql struct {
 	*App
 
-	nearly    int
-	startTime string
-	endTime   string
-	top       int
-	enableSql bool
+	nearly     int
+	startTime  string
+	endTime    string
+	top        int
+	enableSql  bool
+	enableConn bool
 }
 
 func (a *App) AppTopsql() Cmder {
@@ -61,7 +62,8 @@ func (a *AppTopsql) Cmd() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&a.startTime, "start", "", "configure the cluster database query range with start time")
 	cmd.PersistentFlags().StringVar(&a.endTime, "end", "", "configure the cluster database query range with end time")
 	cmd.PersistentFlags().IntVar(&a.top, "top", 10, "configure the cluster database query top sql")
-	cmd.PersistentFlags().BoolVar(&a.enableSql, "enable-sql", false, "configure the cluster database query result display sql_text if setting enable_sql")
+	cmd.PersistentFlags().BoolVar(&a.enableSql, "enable-sql", false, "configure the cluster database query result display sql_text if setting enable-sql")
+	cmd.PersistentFlags().BoolVar(&a.enableConn, "enable-connection", false, "configure the cluster database query result display digest connections if setting enable-conn")
 	return cmd
 }
 
@@ -106,6 +108,7 @@ func (a *AppTopsqlElapsed) Cmd() *cobra.Command {
 				0,
 				"",
 				a.enableSql,
+				a.enableConn,
 				nil,
 			))
 			teaModel, err := p.Run()
@@ -180,6 +183,7 @@ func (a *AppTopsqlExecutions) Cmd() *cobra.Command {
 				0,
 				"",
 				a.enableSql,
+				a.enableConn,
 				nil,
 			))
 			teaModel, err := p.Run()
@@ -253,6 +257,7 @@ func (a *AppTopsqlPlans) Cmd() *cobra.Command {
 				0,
 				"",
 				a.enableSql,
+				a.enableConn,
 				nil,
 			))
 			teaModel, err := p.Run()
@@ -332,6 +337,7 @@ func (a *AppTopsqlCPU) Cmd() *cobra.Command {
 				a.concurrency,
 				a.component,
 				a.enableSql,
+				a.enableConn,
 				a.instances,
 			))
 			teaModel, err := p.Run()
@@ -415,6 +421,7 @@ func (a *AppTopsqlDiagnosis) Cmd() *cobra.Command {
 				a.concurrency,
 				"",
 				a.enableSql,
+				a.enableConn,
 				nil,
 			))
 			teaModel, err := p.Run()
@@ -490,6 +497,7 @@ func (a *AppTopsqlMemory) Cmd() *cobra.Command {
 				0,
 				"",
 				a.enableSql,
+				a.enableConn,
 				nil,
 			))
 			teaModel, err := p.Run()
@@ -527,7 +535,6 @@ func (a *AppTopsqlMemory) Cmd() *cobra.Command {
 						return fmt.Errorf("unknown topsql query msg type [%s]", r.MsgType)
 					}
 				}
-
 			}
 			return nil
 		},

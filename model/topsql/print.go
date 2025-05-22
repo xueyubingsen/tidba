@@ -23,6 +23,7 @@ func PrintTopsqlElapsedTimeComment(top int) {
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
 	fmt.Println(`
 Elapsed Time(s)：SQL 执行总耗时
+Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Executions：SQL 执行总次数
 Elap per Exec(s)：每次执行平均耗时
 Min query Time(s)：SQL 最小执行耗时
@@ -41,6 +42,7 @@ func PrintTopsqlExecutionsComment(top int) {
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
 	fmt.Println(`
 Executions：SQL 执行总次数
+Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Elap per Exec(s)：每次执行平均 SQL 耗时
 Parse per Exec(s)：每次执行平均解析耗时
 Compile per Exec(s)：每次执行平均编译耗时
@@ -60,6 +62,7 @@ func PrintTopsqlPlansComment(top int) {
 	fmt.Println("- Only 执行计划超过 1 次的才会被显示，无查询记录说明没有执行计划变化的 SQL")
 	fmt.Println(`
 SQL plans：SQL 执行计划变化次数
+Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Elapsed Time(s)：SQL 执行总耗时
 Executions：SQL 执行总次数
 Min sql Plan(s)：耗时最小的执行计划耗时（plan elapsed  , plan digest）
@@ -78,6 +81,7 @@ func PrintTopsqlCpuByTidbComment(top int) {
 	fmt.Println("- 默认以集群 TiDB 组件所有实例 CPU 维度查询，如需查询 TiKV 组件或者特定组件实例，请使用 --component {tikv} OR --instances {instAddr:statusPort}")
 	fmt.Println(`
 CPU Time(s)：SQL 执行 CPU 总消耗
+Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Exec counts per sec：每秒执行 SQL 执行次数
 Latency per exec：每次执行平均 SQL 耗时
 Scan record per sec：每秒扫描表记录数
@@ -97,6 +101,7 @@ func PrintTopsqlCpuByTikvComment(top int) {
 	fmt.Println("- 默认以集群 TiKV 组件所有实例 CPU 维度查询，如需查询 TiDB 组件或者特定组件实例，请使用 --component {tidb} OR --instances {instAddr:statusPort}")
 	fmt.Println(`
 CPU Time(s)：SQL 执行 CPU 总消耗
+Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Exec counts per sec：每秒执行 SQL 执行次数
 Latency per exec：每次执行平均 SQL 耗时
 Scan record per sec：每秒扫描表记录数
@@ -132,6 +137,7 @@ func PrintTopsqlMemoryUsageComment(top int) {
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
 	fmt.Println(`
 Memory Size(MB)：SQL 执行总使用内存
+Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Executions：SQL 执行总次数
 Mem per Exec(MB)：每次执行平均内存
 Latency per Exec(s)：每次执行平均耗时
@@ -149,6 +155,7 @@ func PrintTopsqlPlanCacheUsageComment(top int) {
 	fmt.Println("- 查询结果以 SQL 语句执行次数排序，ONLY 匹配显示 IN OR INSERT INTO VALUES SQL 语句")
 	fmt.Println(`
 Executions：SQL 执行总次数
+Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Elap per Exec(s)：每次执行平均 SQL 耗时
 Parse per Exec(s)：每次执行平均解析耗时
 Compile per Exec(s)：每次执行平均编译耗时
@@ -158,4 +165,14 @@ Max query Time(s)：SQL 最大执行耗时
 % Total SQL Time：SQL 耗时占时间窗口内所有 SQL 耗时百分比
 SQL Digest：SQL 指纹
 SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enable-sql]`)
+}
+
+func insertElemSlice(slice []interface{}, index int, value interface{}) []interface{} {
+	newSlice := make([]interface{}, len(slice)+1)
+
+	copy(newSlice, slice[:index])
+	newSlice[index] = value
+	copy(newSlice[index+1:], slice[index:])
+
+	return newSlice
 }

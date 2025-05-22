@@ -279,6 +279,7 @@ type Plan struct {
 
 type CPU struct {
 	CpuTimeSec           float64 `json:"cpu_time_sec"`
+	Connections          string  `json:"connections"`
 	ExecCountsPerSec     float64 `json:"exec_counts_per_sec"`
 	LatencyPerExecSec    float64 `json:"latency_per_exec_sec"`
 	ScanRecordPerSec     float64 `json:"scan_record_per_sec"`
@@ -302,7 +303,7 @@ type NewPlan struct {
 	ScanIndexesPerSec float64 `json:"scan_indexes_per_sec"`
 }
 
-func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, component string, nearly, top int, start, end string, concurrency int, instances []string) ([]CPU, error) {
+func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, db *mysql.Database, clusterName, component string, nearly, top int, start, end string, concurrency int, instances []string) ([]CPU, error) {
 	startSecs, endSecs, err := GenerateTimestampTSO(nearly, start, end)
 	if err != nil {
 		return nil, err
@@ -394,6 +395,16 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 		sqlTotalLatency = sqlTotalLatency + d.CpuTimeMs
 	}
 
+	_, res, err := db.GeneralQuery(ctx, `/*+ monitoring */  select digest,count(1) as count from information_schema.cluster_processlist group by digest`)
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDigestCounts := make(map[string]string)
+	for _, r := range res {
+		sqlDigestCounts[r["digest"]] = r["count"]
+	}
+
 	var cpus []CPU
 	for digest, sqls := range groupbySqlDigest {
 		if digest == "" {
@@ -476,8 +487,16 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 			return newPlans[i].CpuTimeSec <= newPlans[j].CpuTimeSec
 		})
 
+		var digestCounts string
+		if count, ok := sqlDigestCounts[digest]; ok {
+			digestCounts = count
+		} else {
+			digestCounts = "0"
+		}
+
 		cpus = append(cpus, CPU{
 			CpuTimeSec:           math.Round(float64(cpuTimeMs)/1000*100) / 100,
+			Connections:          digestCounts,
 			ExecCountsPerSec:     math.Round(execPerSec*100) / 100,
 			LatencyPerExecSec:    math.Round(latencyPerMs/1000/float64(counts)*100) / 100,
 			ScanRecordPerSec:     math.Round(scanRecordsPerSec*100) / 100,
@@ -781,7 +800,7 @@ func TopsqlDiagnosis(ctx context.Context, clusterName string, db *mysql.Database
 		globalSqlDigest[r["sql_digest"]] = struct{}{}
 	}
 
-	cpus, err := GenerateTosqlCpuTimeByComponentServer(ctx, clusterName, operator.ComponentNameTiKV, nearly, top, start, end, concurrency, nil)
+	cpus, err := GenerateTosqlCpuTimeByComponentServer(ctx, db, clusterName, operator.ComponentNameTiKV, nearly, top, start, end, concurrency, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -795,7 +814,7 @@ func TopsqlDiagnosis(ctx context.Context, clusterName string, db *mysql.Database
 		globalSqlDigest[c.SqlDigest] = struct{}{}
 	}
 
-	cpus, err = GenerateTosqlCpuTimeByComponentServer(ctx, clusterName, operator.ComponentNameTiDB, nearly, top, start, end, concurrency, nil)
+	cpus, err = GenerateTosqlCpuTimeByComponentServer(ctx, db, clusterName, operator.ComponentNameTiDB, nearly, top, start, end, concurrency, nil)
 	if err != nil {
 		return nil, err
 	}

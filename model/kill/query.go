@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -76,6 +77,9 @@ WHERE
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM) // 捕获 Ctrl+C 信号
 
 	round := 0
+
+	var sessionCounts atomic.Uint64
+
 	go func(ctx context.Context) {
 		for {
 			select {
@@ -89,8 +93,18 @@ WHERE
 					cancel()
 					return
 				}
+				counts := len(results)
+				logger.Info(fmt.Sprintf("started round [%d] kill sql digests session operation...", round))
+				logger.Info(fmt.Sprintf("killed sql digests session generate list finished in %fs, session counts [%d] ", time.Since(utime).Seconds(), counts))
 
-				logger.Info(fmt.Sprintf("generate kill sql digest session list finished in %fs", time.Since(utime).Seconds()))
+				if counts == 0 {
+					logger.Info(fmt.Sprintf("completed round [%d] kill sql digests session counts [%d] operation finished in %fs", round, sessionCounts.Load(), time.Since(utime).Seconds()))
+					time.Sleep(time.Duration(interval) * time.Millisecond)
+					round++
+					continue
+				}
+
+				sessionCounts.Store(uint64(counts))
 
 				g, gCtx := errgroup.WithContext(ctx)
 				g.SetLimit(concurrency)
@@ -102,7 +116,9 @@ WHERE
 						if _, err := db.ExecContext(gCtx, fmt.Sprintf("kill tidb %s", instS[2])); err != nil {
 							return err
 						}
-						logger.Info(fmt.Sprintf("killed session on [%s:%s] with id [%s] finished in %fs", instS[0], instS[1], instS[2], time.Since(stime).Seconds()))
+						// -1 operation
+						sessionCounts.Add(^uint64(0))
+						logger.Info(fmt.Sprintf("killed sql digests session on [%s:%s] with id [%s] finished in %fs, session counts [%d]", instS[0], instS[1], instS[2], time.Since(stime).Seconds(), sessionCounts.Load()))
 						return nil
 					})
 				}
@@ -112,10 +128,9 @@ WHERE
 					return
 				}
 
-				round++
-				logger.Info(fmt.Sprintf("killed sql digest session round [%d] finished in %fs", round, time.Since(utime).Seconds()))
-
+				logger.Info(fmt.Sprintf("completed round [%d] kill sql digests session counts [%d] operation finished in %fs", round, sessionCounts.Load(), time.Since(utime).Seconds()))
 				time.Sleep(time.Duration(interval) * time.Millisecond)
+				round++
 			}
 		}
 	}(ctx)
@@ -173,6 +188,8 @@ WHERE
 		defer cancelFunc()
 	}
 
+	var sessionCounts atomic.Uint64
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM) // 捕获 Ctrl+C 信号
 
@@ -191,7 +208,18 @@ WHERE
 					return
 				}
 
-				logger.Info(fmt.Sprintf("generate kill username sql digest session list finished in %fs", time.Since(utime).Seconds()))
+				counts := len(results)
+				logger.Info(fmt.Sprintf("started round [%d] kill username sql digests session operation...", round))
+				logger.Info(fmt.Sprintf("killed username sql digests session generate list finished in %fs, session counts [%d] ", time.Since(utime).Seconds(), counts))
+
+				if counts == 0 {
+					logger.Info(fmt.Sprintf("completed round [%d] kill username sql digests session counts [%d] operation finished in %fs", round, sessionCounts.Load(), time.Since(utime).Seconds()))
+					time.Sleep(time.Duration(interval) * time.Millisecond)
+					round++
+					continue
+				}
+
+				sessionCounts.Store(uint64(counts))
 
 				g, gCtx := errgroup.WithContext(ctx)
 				g.SetLimit(concurrency)
@@ -203,7 +231,9 @@ WHERE
 						if _, err := db.ExecContext(gCtx, fmt.Sprintf("kill tidb %s", instS[2])); err != nil {
 							return err
 						}
-						logger.Info(fmt.Sprintf("killed session on [%s:%s] with id [%s] finished in %fs", instS[0], instS[1], instS[2], time.Since(stime).Seconds()))
+						// -1 operation
+						sessionCounts.Add(^uint64(0))
+						logger.Info(fmt.Sprintf("killed username sql digests session on [%s:%s] with id [%s] finished in %fs, session counts [%d]", instS[0], instS[1], instS[2], time.Since(stime).Seconds(), sessionCounts.Load()))
 						return nil
 					})
 				}
@@ -213,9 +243,9 @@ WHERE
 					return
 				}
 
-				logger.Info(fmt.Sprintf("killed username sql digest session round [%d] finished in %fs", round+1, time.Since(utime).Seconds()))
-
+				logger.Info(fmt.Sprintf("completed round [%d] kill username sql digests session counts [%d] operation finished in %fs", round, sessionCounts.Load(), time.Since(utime).Seconds()))
 				time.Sleep(time.Duration(interval) * time.Millisecond)
+				round++
 			}
 		}
 	}(ctx)

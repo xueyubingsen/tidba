@@ -39,7 +39,7 @@ func (a *App) AppKill() Cmder {
 func (a *AppKill) Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill",
-		Short: "Kill used to kill cluster database sessions or SQL operations",
+		Short: "Kill used to kill cluster database sessions or SQL operations (Require >= v6.1.0)",
 		Long:  "Kill used to kill cluster database sessions or SQL operations where the specified cluster name is located",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmd.Help(); err != nil {
@@ -71,7 +71,7 @@ func (a *AppKill) AppKillSql() Cmder {
 func (a *AppKillSql) Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sql",
-		Short: "SQL kill session operation based on sql digest intermittently or continuously",
+		Short: "SQL kill session operation based on sql digest intermittently or continuously (Require >= v6.1.0)",
 		Long:  "SQL kill session operation based on sql digest intermittently or continuously where the specified cluster name is located",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if a.clusterName == "" {
@@ -112,7 +112,7 @@ func (a *AppKill) AppKillUsername() Cmder {
 func (a *AppKillUsername) Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
-		Short: "User kill session operation based on username sql digest intermittently or continuously",
+		Short: "User kill session operation based on username sql digest intermittently or continuously (Require >= v6.1.0)",
 		Long:  "User kill session operation based on username sql digest intermittently or continuously where the specified cluster name is located",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if a.clusterName == "" {
