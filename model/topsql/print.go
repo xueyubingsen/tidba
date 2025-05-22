@@ -21,9 +21,10 @@ func PrintTopsqlElapsedTimeComment(top int) {
 	fmt.Printf("记录时间窗口内 SQL 执行总耗时排序 TOP %d，按照从大到小的顺序排列\n", top)
 	fmt.Println("NOTES：")
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
+	fmt.Println("- 集群数据库内 statement_summary or history 系统表数据 Only SQL 语运行完才被记录，侧面用 Connections 字段代表当前阶段是否运行")
 	fmt.Println(`
 Elapsed Time(s)：SQL 执行总耗时
-Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Executions：SQL 执行总次数
 Elap per Exec(s)：每次执行平均耗时
 Min query Time(s)：SQL 最小执行耗时
@@ -39,10 +40,11 @@ func PrintTopsqlExecutionsComment(top int) {
 	fmt.Printf("记录时间窗口内 SQL 执行次数排序 TOP %d，按照从大到小的顺序排列\n", top)
 	fmt.Println("NOTES：")
 	fmt.Println("- OLTP 系统的话，这部分比较有用。SQL执行频率非常大，SQL的执行次数会对性能有比较大的影响，OLAP 系统 SQL 重复执行的频率很低，参考意义不大")
+	fmt.Println("- 集群数据库内 statement_summary or history 系统表数据 Only SQL 语运行完才被记录，侧面用 Connections 字段代表当前阶段是否运行")
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
 	fmt.Println(`
 Executions：SQL 执行总次数
-Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Elap per Exec(s)：每次执行平均 SQL 耗时
 Parse per Exec(s)：每次执行平均解析耗时
 Compile per Exec(s)：每次执行平均编译耗时
@@ -59,10 +61,11 @@ func PrintTopsqlPlansComment(top int) {
 	fmt.Printf("记录时间窗口内 SQL 执行计划变化 TOP %d，按照执行计划变化次数排序排列\n", top)
 	fmt.Println("NOTES：")
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
+	fmt.Println("- 集群数据库内 statement_summary or history 系统表数据 Only SQL 语运行完才被记录，侧面用 Connections 字段代表当前阶段是否运行")
 	fmt.Println("- Only 执行计划超过 1 次的才会被显示，无查询记录说明没有执行计划变化的 SQL")
 	fmt.Println(`
 SQL plans：SQL 执行计划变化次数
-Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Elapsed Time(s)：SQL 执行总耗时
 Executions：SQL 执行总次数
 Min sql Plan(s)：耗时最小的执行计划耗时（plan elapsed  , plan digest）
@@ -77,11 +80,11 @@ SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enab
 func PrintTopsqlCpuByTidbComment(top int) {
 	fmt.Printf("记录时间窗口内执行 SQL 指纹占 TiDB 组件 OR 实例维度 CPU 时间总和时间 TOP %d\n", top)
 	fmt.Println("NOTES：")
-	fmt.Println("- 监控范围内 SQL 的执行占 TiDB CPU 时间总和，而不是单次 SQL 执行时间")
+	fmt.Println("- 监控范围内 SQL 的执行占 TiDB CPU 时间总和，而不是单次 SQL 执行时间，且无论 SQL 语句是否运行完成都会被统计记录")
 	fmt.Println("- 默认以集群 TiDB 组件所有实例 CPU 维度查询，如需查询 TiKV 组件或者特定组件实例，请使用 --component {tikv} OR --instances {instAddr:statusPort}")
 	fmt.Println(`
 CPU Time(s)：SQL 执行 CPU 总消耗
-Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Exec counts per sec：每秒执行 SQL 执行次数
 Latency per exec：每次执行平均 SQL 耗时
 Scan record per sec：每秒扫描表记录数
@@ -97,11 +100,11 @@ SQL Text：SQL 文本（参数化） [NOTES：默认字段隐藏，如需显示�
 func PrintTopsqlCpuByTikvComment(top int) {
 	fmt.Printf("记录时间窗口内执行 SQL 指纹占 TiKV 组件 OR 实例维度 CPU 时间总和时间 TOP %d\n", top)
 	fmt.Println("NOTES：")
-	fmt.Println("- 监控范围内 SQL 的执行占 TiDB CPU 时间总和，而不是单次 SQL 执行时间")
+	fmt.Println("- 监控范围内 SQL 的执行占 TiDB CPU 时间总和，而不是单次 SQL 执行时间，且无论 SQL 语句是否运行完成都会被统计记录")
 	fmt.Println("- 默认以集群 TiKV 组件所有实例 CPU 维度查询，如需查询 TiDB 组件或者特定组件实例，请使用 --component {tidb} OR --instances {instAddr:statusPort}")
 	fmt.Println(`
 CPU Time(s)：SQL 执行 CPU 总消耗
-Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Exec counts per sec：每秒执行 SQL 执行次数
 Latency per exec：每次执行平均 SQL 耗时
 Scan record per sec：每秒扫描表记录数
@@ -120,9 +123,11 @@ func PrintTopsqlDiagnosisComment() {
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
 	fmt.Println("- 如果 TiKV CPU、TiDB CPU、Elapsed、Executions、Plans 5 个维度，任意维度输出为空，则代表该 sql digest 未出现在对应维度的 TOP 列表内")
 	fmt.Println("- 结合 TiKV CPU、TiDB CPU、Elapsed、Executions、Plans 5 个维度 TOP 10，基于 SQL Digest 聚合加权计算影响集群性能的 TOP 5 SQL 语句")
+	fmt.Println("- 集群数据库内 statement_summary or history 系统表数据 Only SQL 语运行完才被记录，侧面用 Connections 字段代表当前阶段是否运行")
 	fmt.Println(`
 Score：权重分数
 SQL Digest：SQL 指纹
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 TiKV CPU：TiKV 组件 CPU 维度信息，权重占比 35%
 TiDB CPU：TiDB 组件 CPU 维度信息，权重占比 25%
 Elapsed：Elapsed SQL 执行总耗时维度信息，权重占比 20%
@@ -135,9 +140,10 @@ func PrintTopsqlMemoryUsageComment(top int) {
 	fmt.Printf("记录时间窗口内 SQL 执行总内存排序 TOP %d，按照从大到小的顺序排列\n", top)
 	fmt.Println("NOTES：")
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
+	fmt.Println("- 集群数据库内 statement_summary or history 系统表数据 Only SQL 语运行完才被记录，侧面用 Connections 字段代表当前阶段是否运行")
 	fmt.Println(`
 Memory Size(MB)：SQL 执行总使用内存
-Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Executions：SQL 执行总次数
 Mem per Exec(MB)：每次执行平均内存
 Latency per Exec(s)：每次执行平均耗时
@@ -153,9 +159,10 @@ func PrintTopsqlPlanCacheUsageComment(top int) {
 	fmt.Println("NOTES：")
 	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
 	fmt.Println("- 查询结果以 SQL 语句执行次数排序，ONLY 匹配显示 IN OR INSERT INTO VALUES SQL 语句")
+	fmt.Println("- 集群数据库内 statement_summary or history 系统表数据 Only SQL 语运行完才被记录，侧面用 Connections 字段代表当前阶段是否运行")
 	fmt.Println(`
 Executions：SQL 执行总次数
-Connections：SQL 指纹数据库当前时刻正在运行的连接数 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
+Connections：SQL 指纹数据库当前时刻正在运行的连接数，代表当前数据库是否有运行该类 SQL 语句 [NOTES：默认字段隐藏，如需显示请使用 --enable-connection]
 Elap per Exec(s)：每次执行平均 SQL 耗时
 Parse per Exec(s)：每次执行平均解析耗时
 Compile per Exec(s)：每次执行平均编译耗时
