@@ -67,7 +67,8 @@ func (a *AppSql) Cmd() *cobra.Command {
 
 type AppSqlDisplay struct {
 	*AppSql
-	trend int
+	trend      int
+	enablePlan bool
 }
 
 func (a *AppSql) AppSqlDisplay() Cmder {
@@ -137,15 +138,24 @@ func (a *AppSqlDisplay) Cmd() *cobra.Command {
 					return err
 				}
 
-				for _, p := range resp.QueriedPlanDetail {
-					fmt.Printf("<<<<<<<<<<<< USERNAME [%s] SCHEMA_NAME [%s] >>>>>>>>>>>>\n", p.SampleUser, p.SchemaName)
-					fmt.Printf("MIN PLAN: %s\n", p.MinPlan.PlanDigest)
-					fmt.Println(p.MinPlan.SqlText + "\n")
-					fmt.Println(p.MinPlan.SqlPlan)
-					fmt.Printf("\n------\n")
-					fmt.Printf("MAX PLAN: %s\n", p.MaxPlan.PlanDigest)
-					fmt.Println(p.MaxPlan.SqlText + "\n")
-					fmt.Println(p.MaxPlan.SqlPlan + "\n")
+				if a.enablePlan {
+					if len(resp.QueriedPlanDetail) > 1 {
+						fmt.Printf("Min PLAN SQL SUMMARY:\n")
+					} else {
+						fmt.Printf("Min Max PLAN SQL SUMMARY:\n")
+					}
+					minDetails := resp.QueriedPlanDetail[0]
+					fmt.Printf("Username: [%s] SchemaName: [%s] PlanDigest: [%s]\n", minDetails.SampleUser, minDetails.SchemaName, minDetails.PlanDigest)
+					fmt.Println(minDetails.SqlText + "\n")
+					fmt.Println(minDetails.SqlPlan)
+					if len(resp.QueriedPlanDetail) > 1 {
+						fmt.Printf("\n------\n")
+						fmt.Println("MAX PLAN SQL SUMMARY:")
+						maxDetails := resp.QueriedPlanDetail[len(resp.QueriedPlanDetail)-1]
+						fmt.Printf("Username: [%s] SchemaName: [%s] PlanDigest: [%s]\n", maxDetails.SampleUser, maxDetails.SchemaName, maxDetails.PlanDigest)
+						fmt.Println(maxDetails.SqlText + "\n")
+						fmt.Println(maxDetails.SqlPlan)
+					}
 				}
 			}
 			return nil
@@ -155,6 +165,7 @@ func (a *AppSqlDisplay) Cmd() *cobra.Command {
 		SilenceUsage:     true,
 	}
 	cmd.Flags().IntVar(&a.trend, "trend", 3, "configure the number of sql digest samples, that is, set the statements_summary refresh interval to 1 sampling point")
+	cmd.PersistentFlags().BoolVar(&a.enablePlan, "enable-plan", false, "configure the cluster database to display the SQL digest information for the minimum and maximum average delays")
 	return cmd
 }
 

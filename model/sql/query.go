@@ -18,6 +18,7 @@ package sql
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -166,133 +167,46 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 	var planDetails []*QueiredPlanMsg
 
 	for str, _ := range sampleSchemaUniqs {
-		planDetail := &QueiredPlanMsg{}
-
 		sli := strings.Split(str, ".")
 		sampleUser := sli[0]
 		schemaName := sli[1]
 
-		planDetail.SampleUser = sampleUser
-		if schemaName == "NULLABLE" {
-			planDetail.SchemaName = "NULL"
-		} else {
-			planDetail.SchemaName = schemaName
-		}
-
-		var minPlanbs strings.Builder
-		minPlanbs.WriteString(`SELECT
-			plan_digest,
-			query_sample_text,
-			plan` + "\n")
+		var plands strings.Builder
+		plands.WriteString(`SELECT
+			sub.schema_name,
+			sub.sample_user,
+			sub.plan_digest,
+			ROUND(IFNULL(SUM(sub.sum_latency),0) / 1000000000 ,4) as sum_latency,
+			sum(sub.exec_count) as exec_counts,
+			ROUND(IFNULL(avg(sub.avg_latency),0) / 1000000000 ,4) as avg_latency,
+			AVG(sub.AVG_TOTAL_KEYS) as avg_total_keys,
+    		AVG(sub.AVG_PROCESSED_KEYS) as avg_processed_keys,
+			MIN(sub.plan) as sql_plan,
+    		MIN(sub.query_sample_text) as sql_text` + "\n")
 		if enableHistory {
-			minPlanbs.WriteString(`FROM information_schema.cluster_statements_summary_history sub_min` + "\n")
+			plands.WriteString(`FROM information_schema.cluster_statements_summary_history sub` + "\n")
 		} else {
-			minPlanbs.WriteString(`FROM information_schema.cluster_statements_summary sub_min` + "\n")
+			plands.WriteString(`FROM information_schema.cluster_statements_summary sub` + "\n")
 		}
 		if nearly > 0 {
-			minPlanbs.WriteString(fmt.Sprintf(`WHERE sub_min.summary_begin_time <= NOW()
-		AND sub_min.summary_end_time >= DATE_ADD(NOW(), INTERVAL - %d MINUTE)
-		AND sub_min.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, nearly) + "\n")
+			plands.WriteString(fmt.Sprintf(`WHERE sub.summary_begin_time <= NOW()
+		AND sub.summary_end_time >= DATE_ADD(NOW(), INTERVAL - %d MINUTE)
+		AND sub.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, nearly) + "\n")
 		} else {
 			if start == "" || end == "" {
 				return nil, fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
 			}
-			minPlanbs.WriteString(fmt.Sprintf(`WHERE sub_min.summary_begin_time <= '%s'
-		AND sub_min.summary_end_time >= '%s'
-		AND sub_min.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, end, start) + "\n")
+			plands.WriteString(fmt.Sprintf(`WHERE sub.summary_begin_time <= '%s'
+		AND sub.summary_end_time >= '%s'
+		AND sub.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, end, start) + "\n")
 		}
-		minPlanbs.WriteString(fmt.Sprintf("AND sub_min.digest = '%s' AND sub_min.sample_user = '%s'", sqlDigest, sampleUser))
+		plands.WriteString(fmt.Sprintf("AND sub.digest = '%s' AND sub.sample_user = '%s'", sqlDigest, sampleUser))
 		if schemaName == "NULLABLE" {
-			minPlanbs.WriteString(" AND sub_min.schema_name IS NULL ORDER BY sub_min.min_latency ASC LIMIT 1")
+			plands.WriteString(" AND sub.schema_name IS NULL GROUP BY sub.schema_name,sub.sample_user,sub.plan_digest")
 		} else {
-			minPlanbs.WriteString(fmt.Sprintf(" AND sub_min.schema_name = '%s' ORDER BY sub_min.min_latency ASC LIMIT 1", schemaName))
+			plands.WriteString(fmt.Sprintf(" AND sub.schema_name = '%s' GROUP BY sub.schema_name,sub.sample_user,sub.plan_digest", schemaName))
 		}
-		_, res, err = db.GeneralQuery(ctx, minPlanbs.String())
-		if err != nil {
-			return nil, err
-		}
-
-		minPlanDigest := res[0]["plan_digest"]
-
-		planDetail.MinPlan = &QueriedPlan{
-			PlanDigest: minPlanDigest,
-			SqlText:    res[0]["query_sample_text"],
-			SqlPlan:    res[0]["plan"],
-		}
-
-		var maxPlanbs strings.Builder
-		maxPlanbs.WriteString(`SELECT
-			plan_digest,
-			query_sample_text,
-			plan` + "\n")
-		if enableHistory {
-			maxPlanbs.WriteString(`FROM information_schema.cluster_statements_summary_history sub_max` + "\n")
-		} else {
-			maxPlanbs.WriteString(`FROM information_schema.cluster_statements_summary sub_max` + "\n")
-		}
-		if nearly > 0 {
-			maxPlanbs.WriteString(fmt.Sprintf(`WHERE sub_max.summary_begin_time <= NOW()
-		AND sub_max.summary_end_time >= DATE_ADD(NOW(), INTERVAL - %d MINUTE)
-		AND sub_max.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, nearly) + "\n")
-		} else {
-			if start == "" || end == "" {
-				return nil, fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
-			}
-			maxPlanbs.WriteString(fmt.Sprintf(`WHERE sub_max.summary_begin_time <= '%s'
-		AND sub_max.summary_end_time >= '%s'
-		AND sub_max.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, end, start) + "\n")
-		}
-		maxPlanbs.WriteString(fmt.Sprintf("AND sub_max.digest = '%s' AND sub_max.sample_user = '%s'", sqlDigest, sampleUser))
-		if schemaName == "NULLABLE" {
-			maxPlanbs.WriteString(" AND sub_max.schema_name IS NULL ORDER BY sub_max.max_latency DESC LIMIT 1")
-		} else {
-			maxPlanbs.WriteString(fmt.Sprintf(" AND sub_max.schema_name = '%s' ORDER BY sub_max.max_latency DESC LIMIT 1", schemaName))
-		}
-
-		_, res, err = db.GeneralQuery(ctx, maxPlanbs.String())
-		if err != nil {
-			return nil, err
-		}
-
-		maxPlanDigest := res[0]["plan_digest"]
-
-		planDetail.MaxPlan = &QueriedPlan{
-			PlanDigest: maxPlanDigest,
-			SqlText:    res[0]["query_sample_text"],
-			SqlPlan:    res[0]["plan"],
-		}
-
-		var newBs strings.Builder
-		newBs.WriteString(`/*+ monitoring */ SELECT
-		sample_user,
-		schema_name,
-		COUNT(DISTINCT plan_digest) AS plan_digests,
-		MIN(min_latency) / 1000000000 AS min_latency_s,
-		MAX(max_latency) / 1000000000 AS max_latency_s` + "\n")
-		if enableHistory {
-			newBs.WriteString(`FROM information_schema.cluster_statements_summary_history a` + "\n")
-		} else {
-			newBs.WriteString(`FROM information_schema.cluster_statements_summary a` + "\n")
-		}
-		if nearly > 0 {
-			newBs.WriteString(fmt.Sprintf(`WHERE a.summary_begin_time <= NOW()
-		AND a.summary_end_time >= DATE_ADD(NOW(), INTERVAL - %d MINUTE)
-		AND a.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, nearly) + "\n")
-		} else {
-			if start == "" || end == "" {
-				return nil, fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
-			}
-			newBs.WriteString(fmt.Sprintf(`WHERE a.summary_begin_time <= '%s'
-		AND a.summary_end_time >= '%s'
-		AND a.QUERY_SAMPLE_TEXT NOT LIKE '%%/*+ monitoring */%%'`, end, start) + "\n")
-		}
-		newBs.WriteString(fmt.Sprintf("AND a.digest = '%s' AND a.sample_user = '%s' AND a.schema_name = '%s'\n", sqlDigest, sampleUser, schemaName))
-		newBs.WriteString(`GROUP BY
-		SAMPLE_USER,
-		DIGEST,
-		SCHEMA_NAME`)
-
-		_, res, err = db.GeneralQuery(ctx, newBs.String())
+		_, res, err := db.GeneralQuery(ctx, plands.String())
 		if err != nil {
 			return nil, err
 		}
@@ -303,19 +217,43 @@ func SqlDisplayQuery(ctx context.Context, clusterName string, nearly int, start,
 				r["schema_name"] = "NULL"
 			}
 			p = append(p, fmt.Sprintf("%s[%s]", r["sample_user"], r["schema_name"]))
-			p = append(p, r["plan_digests"])
-			p = append(p, fmt.Sprintf("%s[%s]", r["min_latency_s"], minPlanDigest))
-			p = append(p, fmt.Sprintf("%s[%s]", r["max_latency_s"], maxPlanDigest))
+			p = append(p, r["plan_digest"])
+			p = append(p, r["sum_latency"])
+			p = append(p, r["exec_counts"])
+			p = append(p, r["avg_latency"])
+			p = append(p, r["avg_total_keys"])
+			p = append(p, r["avg_processed_keys"])
 			plans = append(plans, p)
-		}
 
-		planDetails = append(planDetails, planDetail)
+			planDetail := &QueiredPlanMsg{}
+
+			planDetail.SampleUser = sampleUser
+			if schemaName == "NULLABLE" {
+				planDetail.SchemaName = "NULL"
+			} else {
+				planDetail.SchemaName = schemaName
+			}
+			planDetail.PlanDigest = r["plan_digest"]
+			avgLat, err := strconv.ParseFloat(r["avg_latency"], 64)
+			if err != nil {
+				return nil, err
+			}
+			planDetail.AvgLatency = avgLat
+			planDetail.SqlText = r["sql_text"]
+			planDetail.SqlPlan = r["sql_plan"]
+			planDetails = append(planDetails, planDetail)
+		}
 	}
 
 	qrsm.QueriedPlanSummary = &QueriedResultMsg{
-		Columns: []string{"Username[Schema]", "Plan Digests", "Min Plan Digest Latency(s)", "Max Plan Digest Latency(s)"},
+		Columns: []string{"Username[Schema]", "Plan Digest", "Total Latency(s)", "Executions", "Avg Latency(s)", "Avg Total Keys", "Avg Processed Keys"},
 		Results: plans,
 	}
+
+	sort.Slice(planDetails, func(i, j int) bool {
+		return planDetails[i].AvgLatency <= planDetails[j].AvgLatency
+	})
+
 	qrsm.QueriedPlanDetail = planDetails
 
 	// quried trend
@@ -446,10 +384,14 @@ func PrintSqlDisplayTrendSummaryComment(trend int) {
 
 func PrintSqlDisplayPlanSummaryComment() {
 	fmt.Println(`NOTES:`)
-	fmt.Printf("- 查看时间窗口内 SQL 指纹执行计划概览信息，并显示最小以及最大执行计划所用耗时")
+	fmt.Printf("- 查看时间窗口内 SQL 指纹执行计划概览信息，并显示 SQL 指纹相关执行计划所用耗时\n")
+	fmt.Printf("- SQL 指纹平均耗时对应最小以及最大的执行详情默认不显示，如需显示请使用 --enable-sql 参数运行\n")
 	fmt.Println(`
 Username[Schema]：SQL 对应业务用户名以及所在 Schema 名
-Plan Digests： SQL 对应执行计划数
-Min Plan Digest Latency(s)： SQL 最小执行计划 Digest 所用耗时
-Max Plan Digest Latency(s)： SQL 最大执行计划 Digest 所用耗时`)
+Plan Digest： SQL 对应执行计划指纹
+Total Latency(s)： SQL 执行计划指纹对应总耗时
+Executions： SQL 执行计划指纹对应执行次数
+Avg Latency(s)： SQL 执行计划指纹对应平均执行耗时
+Avg total keys：Coprocessor 扫过的 key 的平均数量
+Avg processed keys：Coprocessor 处理的 key 的平均数量。相比 avg_total_keys，avg_processed_keys 不包含 MVCC 的旧版本。如果 avg_total_keys 和 avg_processed_keys 相差很大，说明旧版本比较多`)
 }

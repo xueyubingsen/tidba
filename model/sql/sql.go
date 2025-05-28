@@ -167,12 +167,8 @@ type QueriedResultMsg struct {
 type QueiredPlanMsg struct {
 	SampleUser string
 	SchemaName string
-	MinPlan    *QueriedPlan
-	MaxPlan    *QueriedPlan
-}
-
-type QueriedPlan struct {
 	PlanDigest string
+	AvgLatency float64
 	SqlText    string
 	SqlPlan    string
 }
