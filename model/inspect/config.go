@@ -74,7 +74,7 @@ type Modules struct {
 
 func DefaultInspectConfigTemplate() *InspectConfig {
 	return &InspectConfig{
-		WindowMinutes: 2880,
+		WindowMinutes: 720,
 		HostIPs:       []string{},
 		VariablesParams: map[string]interface{}{
 			"tidb_enable_rate_limit_action":               "off",
