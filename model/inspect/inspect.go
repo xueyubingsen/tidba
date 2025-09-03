@@ -2140,7 +2140,7 @@ func (i *Insepctor) InspDatabaseErrorCount() ([]*DatabaseErrorCount, error) {
 		dec       []*DatabaseErrorCount
 		inspTasks []*task.StepDisplay
 	)
-	tidbInsts, err := i.topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB)
+	tidbInsts, err := i.topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB, operator.ComponentNameUbiSQL)
 	if err != nil {
 		return nil, err
 	}
@@ -3334,7 +3334,7 @@ func (i *Insepctor) InspSqlOrderedByComponentCpuTime(checkTidbCpu, checkTikVCpu 
 func (i *Insepctor) InspSqlOrderedByTiDBCpuTime(startSecs, endSecs int64) ([]*SqlOrderedByTiDBCpuTime, error) {
 	i.logger.Infof("+ Inspect sql ordered by tidb cpu time")
 
-	tidbInsts, err := i.topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB)
+	tidbInsts, err := i.topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB, operator.ComponentNameUbiSQL)
 	if err != nil {
 		return nil, err
 	}

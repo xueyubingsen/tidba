@@ -311,9 +311,14 @@ func (a *AppTopsqlCPU) Cmd() *cobra.Command {
 			if a.clusterName == "" {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
-			if !strings.EqualFold(a.component, operator.ComponentNameTiDB) && !strings.EqualFold(a.component, operator.ComponentNameTiKV) {
+			switch {
+			case strings.EqualFold(a.component, operator.ComponentNameUbiSQL):
+			case strings.EqualFold(a.component, operator.ComponentNameTiDB):
+			case strings.EqualFold(a.component, operator.ComponentNameTiKV):
+			default:
 				return fmt.Errorf("unknown component [%s], only support options for tidb / tikv", a.component)
 			}
+
 			switch {
 			case a.startTime != "" && a.endTime == "":
 				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
@@ -355,7 +360,7 @@ func (a *AppTopsqlCPU) Cmd() *cobra.Command {
 					return nil
 				}
 
-				if strings.EqualFold(a.component, operator.ComponentNameTiDB) {
+				if strings.EqualFold(a.component, operator.ComponentNameTiDB) || strings.EqualFold(a.component, operator.ComponentNameUbiSQL) {
 					topsql.PrintTopsqlCpuByTidbComment(a.top)
 				}
 				if strings.EqualFold(a.component, operator.ComponentNameTiKV) {

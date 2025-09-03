@@ -319,7 +319,7 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, db *mysql.Databa
 		ngAddr     string
 		addrs      []string
 	)
-	if strings.EqualFold(component, operator.ComponentNameTiDB) {
+	if strings.EqualFold(component, operator.ComponentNameTiDB) || strings.EqualFold(component, operator.ComponentNameUbiSQL) {
 		totalAddrs, _, ngAddr = topo.GetClusterComponentStatusPortByTopSqlCPU()
 	} else if strings.EqualFold(component, operator.ComponentNameTiKV) {
 		_, totalAddrs, ngAddr = topo.GetClusterComponentStatusPortByTopSqlCPU()

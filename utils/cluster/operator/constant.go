@@ -16,6 +16,7 @@ limitations under the License.
 package operator
 
 const (
+	ComponentNameUbiSQL       = "ubisql"
 	ComponentNameTiDB         = "tidb"
 	ComponentNameTiKV         = "tikv"
 	ComponentNamePD           = "pd"

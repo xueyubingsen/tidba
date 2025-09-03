@@ -221,7 +221,7 @@ func MetadataCreate(ctx context.Context, content string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		insts, err := topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB)
+		insts, err := topo.GetClusterTopologyComponentInstances(operator.ComponentNameTiDB, operator.ComponentNameUbiSQL)
 		if err != nil {
 			return "", err
 		}

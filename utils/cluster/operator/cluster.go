@@ -203,15 +203,17 @@ func GetDeployedClusterTopology(clusterName string) (*ClusterTopology, error) {
 	return cl, nil
 }
 
-func (topo *ClusterTopology) GetClusterTopologyComponentInstances(componentName string) ([]*Instance, error) {
+func (topo *ClusterTopology) GetClusterTopologyComponentInstances(componentNames ...string) ([]*Instance, error) {
 	var insts []*Instance
 	for _, t := range topo.Instances {
-		if strings.EqualFold(t.ComponentName, componentName) {
-			insts = append(insts, t)
+		for _, componentName := range componentNames {
+			if strings.EqualFold(t.ComponentName, componentName) {
+				insts = append(insts, t)
+			}
 		}
 	}
 	if len(insts) == 0 {
-		return insts, fmt.Errorf("the component_name [%s] is not existed in the cluster_name [%s]", componentName, topo.ClusterMeta.ClusterName)
+		return insts, fmt.Errorf("the component_names [%s] is not existed in the cluster_name [%s]", componentNames, topo.ClusterMeta.ClusterName)
 	}
 	return insts, nil
 }
@@ -345,7 +347,7 @@ func (topo *ClusterTopology) GetClusterComponentStatusPortByTopSqlCPU() ([]strin
 		ngAddr string
 	)
 	for _, t := range topo.Instances {
-		if t.ComponentName == ComponentNameTiDB {
+		if t.ComponentName == ComponentNameTiDB || t.ComponentName == ComponentNameUbiSQL {
 			portSli := strings.Split(t.Ports, "/")
 			var statusPort string
 			if len(portSli) == 1 {
