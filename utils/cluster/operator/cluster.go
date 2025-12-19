@@ -157,6 +157,9 @@ type ClusterMeta struct {
 	DeployUser     string   `json:"deploy_user"`
 	SshType        string   `json:"ssh_type"`
 	TlsEnable      bool     `json:"tls_enable"`
+	TlsCaCert      string   `json:"tls_ca_cert"`
+	TlsClientCert  string   `json:"tls_client_cert"`
+	TlsClientKey   string   `json:"tls_client_key"`
 	DashboardUrl   string   `json:"dashboard_url"`
 	GrafanaUrls    []string `json:"grafana_urls"`
 }

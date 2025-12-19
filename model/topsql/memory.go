@@ -276,7 +276,7 @@ func TopsqlPlanCacheUsageSummary(ctx context.Context, topo *operator.ClusterTopo
 		return nil, err
 	}
 
-	resp, err := request.Request(request.DefaultRequestMethodGet, api, nil, "", "")
+	resp, err := request.Request(request.DefaultRequestMethodGet, api, nil, topo.ClusterMeta.TlsCaCert, topo.ClusterMeta.TlsClientCert, topo.ClusterMeta.TlsClientKey)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func TopsqlPlanCacheUsageSummary(ctx context.Context, topo *operator.ClusterTopo
 			return nil, err
 		}
 	}
-	resp, err = request.Request(request.DefaultRequestMethodGet, api, nil, "", "")
+	resp, err = request.Request(request.DefaultRequestMethodGet, api, nil, topo.ClusterMeta.TlsCaCert, topo.ClusterMeta.TlsClientCert, topo.ClusterMeta.TlsClientKey)
 	if err != nil {
 		return nil, err
 	}

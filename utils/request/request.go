@@ -29,8 +29,8 @@ const (
 	DefaultRequestMethodPost = "POST"
 )
 
-func Request(method, url string, body []byte, cacertPath, certPath string) ([]byte, error) {
-	client, err := createHTTPClient(cacertPath, certPath)
+func Request(method, url string, body []byte, cacertPath, certPath, keyPath string) ([]byte, error) {
+	client, err := createHTTPClient(cacertPath, certPath, keyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -44,17 +44,17 @@ func Request(method, url string, body []byte, cacertPath, certPath string) ([]by
 }
 
 // createHTTPClient creates an HTTP client with optional TLS configuration.
-func createHTTPClient(cacertPath, certPath string) (*http.Client, error) {
+func createHTTPClient(cacertPath, certPath, keyPath string) (*http.Client, error) {
 	var tlsConfig *tls.Config
 
-	// If either cacertPath or certPath is provided, set up TLS config
-	if cacertPath != "" || certPath != "" {
+	// If any of cacertPath, certPath, or keyPath is provided, set up TLS config
+	if cacertPath != "" || certPath != "" || keyPath != "" {
 		caCertPool, err := loadCACert(cacertPath)
 		if err != nil {
 			return nil, err
 		}
 
-		cert, err := loadClientCert(certPath)
+		cert, err := loadClientCert(certPath, keyPath)
 		if err != nil {
 			return nil, err
 		}
@@ -87,13 +87,14 @@ func loadCACert(cacertPath string) (*x509.CertPool, error) {
 	return caCertPool, nil
 }
 
-// loadClientCert loads the client certificate from the given path.
-func loadClientCert(certPath string) (tls.Certificate, error) {
-	if certPath == "" {
+// loadClientCert loads the client certificate and key from the given paths.
+func loadClientCert(certPath, keyPath string) (tls.Certificate, error) {
+	if certPath == "" && keyPath == "" {
 		return tls.Certificate{}, nil
 	}
 
-	cert, err := tls.LoadX509KeyPair(certPath, certPath)
+	// Both certPath and keyPath are required if either is provided
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
 		return tls.Certificate{}, err
 	}

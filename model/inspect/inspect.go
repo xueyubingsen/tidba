@@ -132,16 +132,17 @@ func (i *Insepctor) GenPrometheusAPIPrefix(qpsQuery string, startTs, endTs time.
 	return fmt.Sprintf("%s?%s", baseURL, params.Encode()), nil
 }
 
-func (i *Insepctor) GenNgMonitorAPIPrefix(startSecs, endSecs int64, comp, instAddr string, top int) (string, error) {
+func (i *Insepctor) GenNgMonitorAPIPrefix(startSecs, endSecs int64, accessComp, instAddr string, top int) (string, error) {
 	promp, err := i.topo.GetClusterTopologyComponentInstances(operator.ComponentNamePrometheus)
 	if err != nil {
 		return "", err
 	}
 	portSli := strings.Split(promp[0].Ports, "/")
-	if len(portSli) < 2 {
+	if len(portSli) < 4 || len(portSli) > 4 {
 		return "", fmt.Errorf("prometheus ng monitor port not found, ports: [%v]", promp[0].Ports)
 	}
-	return fmt.Sprintf("http://%s:%s/topsql/v1/summary?end=%d&instance=%s&instance_type=%s&start=%d&top=%d", promp[0].Host, portSli[1], endSecs, instAddr, comp, startSecs, top), nil
+
+	return fmt.Sprintf("http://%s:%s/topsql/v1/summary?end=%d&instance=%s&instance_type=%s&start=%d&top=%d", promp[0].Host, portSli[len(portSli)-1], endSecs, instAddr, accessComp, startSecs, top), nil
 }
 
 type PromResp struct {
@@ -533,7 +534,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 			return true
 		},
 		func() error {
-			resp, err := request.Request(request.DefaultRequestMethodGet, fmt.Sprintf("%s/cluster", pdAPI), nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, fmt.Sprintf("%s/cluster", pdAPI), nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -565,7 +566,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 			if err != nil {
 				return err
 			}
-			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -597,7 +598,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 			if err != nil {
 				return err
 			}
-			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -631,7 +632,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 			if err != nil {
 				return err
 			}
-			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -664,7 +665,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 			if err != nil {
 				return err
 			}
-			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -933,7 +934,7 @@ HAVING
 			if err != nil {
 				return err
 			}
-			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, prompReq, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -947,7 +948,7 @@ HAVING
 			if err != nil {
 				return err
 			}
-			resp, err = request.Request(request.DefaultRequestMethodGet, prompReq, nil, "", "")
+			resp, err = request.Request(request.DefaultRequestMethodGet, prompReq, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -1012,7 +1013,7 @@ HAVING
 			if err != nil {
 				return err
 			}
-			resp, err := request.Request(request.DefaultRequestMethodGet, fmt.Sprintf("%s/schedulers", pdAPI), nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, fmt.Sprintf("%s/schedulers", pdAPI), nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -1531,7 +1532,7 @@ func (i *Insepctor) InspSystemConfig() ([]*SystemConfig, []*SystemConfigOutput, 
 		},
 		func() error {
 			var bs strings.Builder
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, diskWriteApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, diskWriteApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -1579,7 +1580,7 @@ func (i *Insepctor) InspSystemConfig() ([]*SystemConfig, []*SystemConfigOutput, 
 		},
 		func() error {
 			var bs strings.Builder
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, diskReadApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, diskReadApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2346,7 +2347,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2356,7 +2357,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				return err
 			}
 
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2406,7 +2407,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 			return true
 		},
 		func() error {
-			regionResp, err := request.Request(request.DefaultRequestMethodGet, regionApi, nil, "", "")
+			regionResp, err := request.Request(request.DefaultRequestMethodGet, regionApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2457,7 +2458,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 			return true
 		},
 		func() error {
-			requestResp, err := request.Request(request.DefaultRequestMethodGet, requestApi, nil, "", "")
+			requestResp, err := request.Request(request.DefaultRequestMethodGet, requestApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2507,7 +2508,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 			return true
 		},
 		func() error {
-			walResp, err := request.Request(request.DefaultRequestMethodGet, walApi, nil, "", "")
+			walResp, err := request.Request(request.DefaultRequestMethodGet, walApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2655,7 +2656,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2663,7 +2664,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2735,7 +2736,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2743,7 +2744,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2788,7 +2789,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			waitResp, err := request.Request(request.DefaultRequestMethodGet, waitApi, nil, "", "")
+			waitResp, err := request.Request(request.DefaultRequestMethodGet, waitApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2876,7 +2877,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2884,7 +2885,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2939,7 +2940,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -2947,7 +2948,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3002,7 +3003,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3010,7 +3011,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3065,7 +3066,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3073,7 +3074,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3128,7 +3129,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, "", "")
+			avgResp, err := request.Request(request.DefaultRequestMethodGet, avgApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3136,7 +3137,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			maxResp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3186,7 +3187,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			resp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, "", "")
+			resp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
@@ -3365,7 +3366,7 @@ func (i *Insepctor) InspSqlOrderedByTiDBCpuTime(startSecs, endSecs int64) ([]*Sq
 					return true
 				},
 				func() error {
-					resp, err := request.Request(request.DefaultRequestMethodGet, req, nil, "", "")
+					resp, err := request.Request(request.DefaultRequestMethodGet, req, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 					if err != nil {
 						return err
 					}
@@ -3437,7 +3438,7 @@ func (i *Insepctor) InspSqlOrderedByTiKVCpuTime(startSecs, endSecs int64) ([]*Sq
 					return true
 				},
 				func() error {
-					resp, err := request.Request(request.DefaultRequestMethodGet, req, nil, "", "")
+					resp, err := request.Request(request.DefaultRequestMethodGet, req, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 					if err != nil {
 						return err
 					}
