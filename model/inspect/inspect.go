@@ -162,7 +162,7 @@ type Result struct {
 func (i *Insepctor) GetPromRequestAvgValueByNonMetric(req string, resp []byte) (decimal.Decimal, error) {
 	var promResp *PromResp
 	if err := json.Unmarshal(resp, &promResp); err != nil {
-		return decimal.Decimal{}, fmt.Errorf("unmarsh prometheus response failed: %v", err)
+		return decimal.Decimal{}, fmt.Errorf("unmarshal prometheus response failed: %v", err)
 	}
 
 	if promResp.Status != "success" {
@@ -3377,7 +3377,7 @@ func (i *Insepctor) InspSqlOrderedByTiDBCpuTime(startSecs, endSecs int64) ([]*Sq
 					return nil
 				},
 			); err != nil {
-				return err
+				return fmt.Errorf("request [%s] inspect tidb instance [%s] cpu time failed: %v", req, inst.ID, err)
 			}
 
 			return nil
