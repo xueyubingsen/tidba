@@ -43,6 +43,7 @@ import (
 )
 
 const ClusterInspectMinDatabaseVersionRequire = "6.5.0"
+const ClusterInspectMinSplitBucketSchedulerRequire = "7.1.0"
 
 type Insepctor struct {
 	ctx              context.Context
@@ -427,11 +428,22 @@ func (i *Insepctor) GetPromRequestMaxValueByMetric(req string, resp []byte, pdRe
 
 func (i *Insepctor) InspClusterDatabaseVersion() error {
 	i.logger.Infof("+ Inspect cluster version")
-	version := i.topo.ClusterMeta.ClusterVersion
-	if stringutil.VersionOrdinal(strings.TrimPrefix(version, "v")) >= stringutil.VersionOrdinal(ClusterInspectMinDatabaseVersionRequire) {
+	// 适配平凯数据库版本 v7.1.8-5.2
+	vers := strings.Split(i.topo.ClusterMeta.ClusterVersion, "-")
+
+	var version string
+	if len(vers) > 1 {
+		tmpVers := strings.Split(strings.TrimPrefix(vers[0], "v"), ".")
+		fmt.Println(tmpVers)
+		version = fmt.Sprintf("%s.%s", tmpVers[len(tmpVers)-1], vers[len(vers)-1])
+	} else {
+		version = strings.TrimPrefix(vers[len(vers)-1], "v")
+	}
+
+	if stringutil.VersionOrdinal(version) >= stringutil.VersionOrdinal(ClusterInspectMinDatabaseVersionRequire) {
 		return nil
 	}
-	return fmt.Errorf("the cluster [%s] version is %v, which is lower than %v. inspect exits", i.topo.ClusterMeta.ClusterName, version, ClusterInspectMinDatabaseVersionRequire)
+	return fmt.Errorf("the cluster [%s] version is %v, which is lower than %v", i.topo.ClusterMeta.ClusterName, i.topo.ClusterMeta.ClusterVersion, ClusterInspectMinDatabaseVersionRequire)
 }
 
 func (i *Insepctor) InspClusterTopSqlIsEnable() error {
@@ -719,7 +731,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 
 			bs = append(bs, &BasicSoftware{
 				Category: fmt.Sprintf("SQL duration P99 均值（%.2fH）", float64(i.inspConfig.WindowMinutes/60)),
-				Value:    value.String(),
+				Value:    fmt.Sprintf("%vms", value.Mul(decimal.NewFromInt(1000)).Round(2).String()),
 			})
 			return nil
 		},
@@ -1030,7 +1042,35 @@ HAVING
 		return nil, err
 	}
 
-	if err := request.Retry(
+	// 版本判断（默认调度器行为）
+	var standardSchedulers []string
+
+	// 适配平凯数据库版本 v7.1.8-5.2
+	vers := strings.Split(i.topo.ClusterMeta.ClusterVersion, "-")
+
+	var version string
+	if len(vers) > 1 {
+		tmpVers := strings.Split(strings.TrimPrefix(vers[0], "v"), ".")
+		fmt.Println(tmpVers)
+		version = fmt.Sprintf("%s.%s", tmpVers[len(tmpVers)-1], vers[len(vers)-1])
+	} else {
+		version = strings.TrimPrefix(vers[len(vers)-1], "v")
+	}
+
+	if stringutil.VersionOrdinal(version) >= stringutil.VersionOrdinal(ClusterInspectMinSplitBucketSchedulerRequire) {
+		standardSchedulers = []string{
+			"balance-leader-scheduler",
+			"balance-hot-region-scheduler",
+			"balance-region-scheduler"}
+	} else {
+		standardSchedulers = []string{
+			"balance-leader-scheduler",
+			"balance-hot-region-scheduler",
+			"split-bucket-scheduler",
+			"balance-region-scheduler"}
+	}
+
+	if err = request.Retry(
 		&request.RetryConfig{
 			MaxRetries: request.DefaultRequestErrorMaxRetries,
 			Delay:      request.DefaultRequestErrorRereyDelay,
@@ -1039,11 +1079,6 @@ HAVING
 			return true
 		},
 		func() error {
-			var standardSchedulers = []string{
-				"balance-leader-scheduler",
-				"balance-hot-region-scheduler",
-				"split-bucket-scheduler",
-				"balance-region-scheduler"}
 
 			// abnormal scheduler list (for emergency use, should not exist for a long time)
 			var emergencySchedulers = []string{
@@ -1197,8 +1232,16 @@ func (i *Insepctor) InspDevBestPractices() ([]*DevBestPractice, bool, []*InspDev
 		+--------------------+
 		1 row in set (0.00 sec)
 	*/
-	versionSli := strings.Split(res[0]["VERSION"], "-")
-	version := strings.Trim(versionSli[2], "v")
+	vers := strings.Split(res[0]["VERSION"], "-")
+
+	// 适配平凯数据库版本 8.0.11-TiDB-v7.1.8-5.2
+	var version string
+	if len(vers) > 3 {
+		tmpVers := strings.Split(strings.TrimPrefix(vers[len(vers)-2], "v"), ".")
+		version = fmt.Sprintf("%s.%s", tmpVers[len(tmpVers)-1], vers[len(vers)-1])
+	} else {
+		version = strings.TrimPrefix(vers[len(vers)-1], "v")
+	}
 
 	globalExceedFlag := false
 	for seq, dbp := range DefaultDevBestPracticesInspItems() {
@@ -1436,8 +1479,16 @@ func (i *Insepctor) InspDatabaseStatistics() ([]*DatabaseStatistics, bool, []*In
 		+--------------------+
 		1 row in set (0.00 sec)
 	*/
-	versionSli := strings.Split(res[0]["VERSION"], "-")
-	version := strings.Trim(versionSli[2], "v")
+	vers := strings.Split(res[0]["VERSION"], "-")
+
+	// 适配平凯数据库版本 8.0.11-TiDB-v7.1.8-5.2
+	var version string
+	if len(vers) > 3 {
+		tmpVers := strings.Split(strings.TrimPrefix(vers[len(vers)-2], "v"), ".")
+		version = fmt.Sprintf("%s.%s", tmpVers[len(tmpVers)-1], vers[len(vers)-1])
+	} else {
+		version = strings.TrimPrefix(vers[len(vers)-1], "v")
+	}
 
 	globalExceedFlag := false
 	for seq, dbp := range DefaultInspDatabaseStatisticsItems() {
@@ -2016,32 +2067,40 @@ func (i *Insepctor) InspSystemCrontab() ([]*SystemCrontab, error) {
 				}
 			}
 
-			sysCrons = append(sysCrons, &SystemCrontab{
-				IpAddress:      host,
-				CrontabUser:    i.gOpt.SSHUser,
-				CrontabContent: strings.Join(lines, "\n"),
-			})
-
 			var newLines []string
 
-			stdout, _, ok = ctxt.GetInner(ctx).GetOutputs(fmt.Sprintf("%s_deploy_cron", host))
+			deployStdout, _, ok := ctxt.GetInner(ctx).GetOutputs(fmt.Sprintf("%s_deploy_cron", host))
 			if !ok {
 				return nil, fmt.Errorf("no check results found for %s", fmt.Sprintf("%s_deploy_cron", host))
 			}
-			scanner = bufio.NewScanner(bytes.NewReader(stdout))
-			for scanner.Scan() {
-				if scanner.Text() == "none" {
+			depScanner := bufio.NewScanner(bytes.NewReader(deployStdout))
+			for depScanner.Scan() {
+				if depScanner.Text() == "none" {
 					newLines = append(newLines, strings.Trim("N/A", "\n"))
 				} else {
-					newLines = append(newLines, strings.Trim(scanner.Text(), "\n"))
+					newLines = append(newLines, strings.Trim(depScanner.Text(), "\n"))
 				}
 			}
 
-			sysCrons = append(sysCrons, &SystemCrontab{
-				IpAddress:      host,
-				CrontabUser:    i.label.ClusterMeta.DeployUser,
-				CrontabContent: strings.Join(newLines, "\n"),
-			})
+			// 处理部署用户与集群用户同个用户名情况
+			if i.gOpt.SSHUser == i.label.ClusterMeta.DeployUser {
+				sysCrons = append(sysCrons, &SystemCrontab{
+					IpAddress:      host,
+					CrontabUser:    i.label.ClusterMeta.DeployUser,
+					CrontabContent: strings.Join(append(lines, newLines...), "\n"),
+				})
+			} else {
+				sysCrons = append(sysCrons, &SystemCrontab{
+					IpAddress:      host,
+					CrontabUser:    i.gOpt.SSHUser,
+					CrontabContent: strings.Join(lines, "\n"),
+				})
+				sysCrons = append(sysCrons, &SystemCrontab{
+					IpAddress:      host,
+					CrontabUser:    i.label.ClusterMeta.DeployUser,
+					CrontabContent: strings.Join(newLines, "\n"),
+				})
+			}
 		}
 	}
 
@@ -2415,12 +2474,12 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 					return fmt.Errorf("pd machine cpu parse value [%s] failed: %v", hostCpu, err)
 				}
 
-				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
+				if maxVal[inst].Mul(decimal.NewFromFloat(float64(cpuLimitI))).GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
 					psbp = append(psbp, &PerformanceStatisticsByPD{
 						PDInstance:      statusPortMapping[inst],
 						MonitoringItems: "cpu usage",
-						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
-						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
+						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.Mul(decimal.NewFromFloat(100)).Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].Mul(decimal.NewFromFloat(100)).Round(2).String()),
 						ParamValue:      hostCpu,
 						SuggestValue:    "应低于 80% * cpu limit",
 						Comment:         "读取服务器 vcore 数量",
@@ -2470,8 +2529,8 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 					psbp = append(psbp, &PerformanceStatisticsByPD{
 						PDInstance:      statusPortMapping[inst],
 						MonitoringItems: "99% region heartbeat handle latency",
-						AvgMetrics:      fmt.Sprintf(`%vs`, avg.Round(2).String()),
-						MaxMetrics:      fmt.Sprintf(`%vs`, maxRegionVal[inst].Round(2).String()),
+						AvgMetrics:      fmt.Sprintf(`%vms`, avg.Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%vms`, maxRegionVal[inst].Round(2).String()),
 						ParamValue:      suggest,
 						SuggestValue:    fmt.Sprintf("应低于 %v", suggest),
 						Comment:         "经验延迟值",
@@ -2521,8 +2580,8 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				psbp = append(psbp, &PerformanceStatisticsByPD{
 					PDInstance:      i.topo.GetClusterComponentPDComponenetLeaderServiceAddress(),
 					MonitoringItems: "99% handle request duration",
-					AvgMetrics:      fmt.Sprintf(`%vs`, avgRequestVal.Round(2).String()),
-					MaxMetrics:      fmt.Sprintf(`%vs`, maxRequestVal.Round(2).String()),
+					AvgMetrics:      fmt.Sprintf(`%vms`, avgRequestVal.Round(2).String()),
+					MaxMetrics:      fmt.Sprintf(`%vms`, maxRequestVal.Round(2).String()),
 					ParamValue:      suggest,
 					SuggestValue:    fmt.Sprintf("应低于 %v", suggest),
 					Comment:         "经验延迟值",
@@ -2571,8 +2630,8 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 					psbp = append(psbp, &PerformanceStatisticsByPD{
 						PDInstance:      statusPortMapping[inst],
 						MonitoringItems: "99% WAL fsync duration",
-						AvgMetrics:      fmt.Sprintf(`%vs`, avg.Round(2).String()),
-						MaxMetrics:      fmt.Sprintf(`%vs`, maxWalVal[inst].Round(2).String()),
+						AvgMetrics:      fmt.Sprintf(`%vms`, avg.Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%vms`, maxWalVal[inst].Round(2).String()),
 						ParamValue:      suggest,
 						SuggestValue:    fmt.Sprintf("应低于 %v", suggest),
 						Comment:         "经验延迟值",
@@ -2739,12 +2798,12 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 					return fmt.Errorf("tidb machine cpu parse value [%s] failed: %v", paramStr, err)
 				}
 
-				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
+				if maxVal[inst].Mul(decimal.NewFromInt(cpuLimitI)).GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
 					psbp = append(psbp, &PerformanceStatisticsByTiDB{
 						TiDBInstance:    statusPortMapping[inst],
 						MonitoringItems: "cpu usage",
-						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
-						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
+						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.Mul(decimal.NewFromInt(100)).Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].Mul(decimal.NewFromInt(100)).Round(2).String()),
 						ParamValue:      paramStr,
 						SuggestValue:    "应低于 80% * cpu limit",
 						Comment:         remark,
@@ -2801,9 +2860,9 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 					psbp = append(psbp, &PerformanceStatisticsByTiDB{
 						TiDBInstance:    statusPortMapping[inst],
 						MonitoringItems: "memory usage",
-						AvgMetrics:      avg.DivRound(decimalN, 2).String(),
-						MaxMetrics:      maxVal[inst].DivRound(decimalN, 2).String(),
-						ParamValue:      fmt.Sprintf("%2.f", memoryLimit),
+						AvgMetrics:      fmt.Sprintf(`%vGB`, avg.DivRound(decimalN, 2).String()),
+						MaxMetrics:      fmt.Sprintf(`%vGB`, maxVal[inst].DivRound(decimalN, 2).String()),
+						ParamValue:      fmt.Sprintf("%2.fGB", memoryLimit),
 						SuggestValue:    "应低于 80% * memory limit",
 						Comment:         "读取 information_schema.MEMORY_USAGE 的 MEMORY_LIMIT 字段",
 					})
@@ -2853,8 +2912,8 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 					psbp = append(psbp, &PerformanceStatisticsByTiDB{
 						TiDBInstance:    statusPortMapping[inst],
 						MonitoringItems: "commit token wait duration",
-						AvgMetrics:      fmt.Sprintf(`%vs`, avg.Round(2).String()),
-						MaxMetrics:      fmt.Sprintf(`%vs`, waitMaxVal[inst].Round(2).String()),
+						AvgMetrics:      fmt.Sprintf(`%vms`, avg.DivRound(decimalMs, 2).String()),
+						MaxMetrics:      fmt.Sprintf(`%vms`, waitMaxVal[inst].DivRound(decimalMs, 2).String()),
 						ParamValue:      suggest,
 						SuggestValue:    fmt.Sprintf("应低于 %v", suggest),
 						Comment:         "经验延迟值",
@@ -2943,12 +3002,12 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 					return fmt.Errorf("tikv machine grpc cpu parse value [%s] failed: %v", defaultVal, err)
 				}
 
-				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
+				if maxVal[inst].Mul(decimal.NewFromInt(cpuLimitI)).GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
 					psbp = append(psbp, &PerformanceStatisticsByTiKV{
 						TiKVInstance:    statusPortMapping[inst],
 						MonitoringItems: "grpc poll cpu",
-						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
-						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
+						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.Mul(decimal.NewFromInt(100)).Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].Mul(decimal.NewFromInt(100)).Round(2).String()),
 						ParamValue:      defaultVal,
 						SuggestValue:    "应低于 80% * server.grpc-concurrency",
 						Comment:         "读取 server.grpc-concurrency 参数配置值",
@@ -3006,12 +3065,12 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 					return fmt.Errorf("tikv machine scheduler cpu parse value [%s] failed: %v", defaultVal, err)
 				}
 
-				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
+				if maxVal[inst].Mul(decimal.NewFromInt(cpuLimitI)).GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
 					psbp = append(psbp, &PerformanceStatisticsByTiKV{
 						TiKVInstance:    statusPortMapping[inst],
 						MonitoringItems: "scheduler worker cpu",
-						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
-						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
+						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.Mul(decimal.NewFromInt(100)).Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].Mul(decimal.NewFromInt(100)).Round(2).String()),
 						ParamValue:      defaultVal,
 						SuggestValue:    "应低于 80% * storage.scheduler-worker-pool-size",
 						Comment:         "读取 storage.scheduler-worker-pool-size 参数配置值",
@@ -3069,12 +3128,12 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 					return fmt.Errorf("tikv machine unified max thread parse value [%s] failed: %v", defaultVal, err)
 				}
 
-				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
+				if maxVal[inst].Mul(decimal.NewFromInt(cpuLimitI)).GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
 					psbp = append(psbp, &PerformanceStatisticsByTiKV{
 						TiKVInstance:    statusPortMapping[inst],
 						MonitoringItems: "unified read pool cpu",
-						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
-						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
+						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.Mul(decimal.NewFromInt(100)).Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].Mul(decimal.NewFromInt(100)).Round(2).String()),
 						ParamValue:      defaultVal,
 						SuggestValue:    "应低于 80% * readpool.unified.max-thread-count",
 						Comment:         "读取 readpool.unified.max-thread-count 参数配置值",
@@ -3132,12 +3191,12 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 					return fmt.Errorf("tikv machine raft store cpu parse value [%s] failed: %v", defaultVal, err)
 				}
 
-				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
+				if maxVal[inst].Mul(decimal.NewFromInt(cpuLimitI)).GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
 					psbp = append(psbp, &PerformanceStatisticsByTiKV{
 						TiKVInstance:    statusPortMapping[inst],
 						MonitoringItems: "raft store cpu",
-						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
-						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
+						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.Mul(decimal.NewFromInt(100)).Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].Mul(decimal.NewFromInt(100)).Round(2).String()),
 						ParamValue:      defaultVal,
 						SuggestValue:    "应低于 80% * raftstore.store-pool-size",
 						Comment:         "读取 raftstore.store-pool-size 参数配置值",
@@ -3195,12 +3254,12 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 					return fmt.Errorf("tikv machine raft apply cpu parse value [%s] failed: %v", defaultVal, err)
 				}
 
-				if maxVal[inst].GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
+				if maxVal[inst].Mul(decimal.NewFromInt(cpuLimitI)).GreaterThan(decimal.NewFromFloat(float64(cpuLimitI) * 0.8)) {
 					psbp = append(psbp, &PerformanceStatisticsByTiKV{
 						TiKVInstance:    statusPortMapping[inst],
 						MonitoringItems: "async apply cpu",
-						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.String()),
-						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].String()),
+						AvgMetrics:      fmt.Sprintf(`%v%%`, avg.Mul(decimal.NewFromInt(100)).Round(2).String()),
+						MaxMetrics:      fmt.Sprintf(`%v%%`, maxVal[inst].Mul(decimal.NewFromInt(100)).Round(2).String()),
 						ParamValue:      defaultVal,
 						SuggestValue:    "应低于 80% * raftstore.apply-pool-size",
 						Comment:         "读取 raftstore.apply-pool-size 参数配置值",
