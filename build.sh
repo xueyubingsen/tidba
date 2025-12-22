@@ -31,6 +31,34 @@ echo "Prepare build flags [$LDFLAGS]"
 APP_SRC=$(pwd)
 TiDBA="$APP_SRC/main.go"
 
+# Build tags support: set BUILD_TAGS env, or pass --tags "tag1 tag2", or --nolicense to add nolicense tag
+# Usage examples:
+#   BUILD_TAGS="tag1 tag2" ./build.sh
+#   ./build.sh --tags "tag1 tag2"
+#   ./build.sh --nolicense
+GOTAGS="${BUILD_TAGS:-}"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --tags|-t)
+            GOTAGS="$2"
+            shift 2
+            ;;
+        --nolicense)
+            if [ -z "$GOTAGS" ]; then
+                GOTAGS="nolicense"
+            else
+                GOTAGS="$GOTAGS nolicense"
+            fi
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+if [ -n "$GOTAGS" ]; then
+    echo "Build tags: [$GOTAGS]"
+fi
 
 # Compiled output
 LINUX_AMD64_DIR="$APP_SRC/linux/amd64"
@@ -45,10 +73,18 @@ for platform in "${platforms[@]}"; do
     echo "Compiling for $XGOOS/$XGOARCH..."
 
     if { [ "$XGOOS" == "." ] || [ "$XGOOS" == "linux" ]; } && { [ "$XGOARCH" == "." ] || [ "$XGOARCH" == "amd64" ]; }; then
-        GOOS=linux GOARCH=amd64 GO111MODULE=on CGO_ENABLED=0 go build -o "$LINUX_AMD64_DIR/tidba" -ldflags "$LDFLAGS" ${TiDBA}
+        if [ -n "$GOTAGS" ]; then
+            GOOS=linux GOARCH=amd64 GO111MODULE=on CGO_ENABLED=0 go build -tags "$GOTAGS" -o "$LINUX_AMD64_DIR/tidba" -ldflags "$LDFLAGS" ${TiDBA}
+        else
+            GOOS=linux GOARCH=amd64 GO111MODULE=on CGO_ENABLED=0 go build -o "$LINUX_AMD64_DIR/tidba" -ldflags "$LDFLAGS" ${TiDBA}
+        fi
     fi
 
     if { [ "$XGOOS" == "." ] || [ "$XGOOS" == "linux" ]; } && { [ "$XGOARCH" == "." ] || [ "$XGOARCH" == "arm64" ]; }; then
-        GOOS=linux GOARCH=arm64 GO111MODULE=on CGO_ENABLED=0 go build -o "$LINUX_ARM64_DIR/tidba" -ldflags "$LDFLAGS" ${TiDBA}
+        if [ -n "$GOTAGS" ]; then
+            GOOS=linux GOARCH=arm64 GO111MODULE=on CGO_ENABLED=0 go build -tags "$GOTAGS" -o "$LINUX_ARM64_DIR/tidba" -ldflags "$LDFLAGS" ${TiDBA}
+        else
+            GOOS=linux GOARCH=arm64 GO111MODULE=on CGO_ENABLED=0 go build -o "$LINUX_ARM64_DIR/tidba" -ldflags "$LDFLAGS" ${TiDBA}
+        fi
     fi
 done

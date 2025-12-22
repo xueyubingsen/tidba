@@ -91,6 +91,12 @@ func (a *App) Cmd() *cobra.Command {
 				return nil
 			}
 
+			// if built with -tags nolicense, skip license verification entirely (for tests)
+			if !IsLicenseCheckEnabled() {
+				a.history = fmt.Sprintf("%s/tidba_history", dir)
+				return nil
+			}
+
 			macAddr, err := getDefaultMACAddress()
 			if err != nil {
 				return err
