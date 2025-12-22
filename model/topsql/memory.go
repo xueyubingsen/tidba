@@ -444,7 +444,7 @@ func GenPrometheusAPIPrefix(topo *operator.ClusterTopology, qpsQuery string, sta
 	if err != nil {
 		return "", err
 	}
-	baseURL := fmt.Sprintf("http://%s:%d/api/v1/query_range", insts[0].Host, insts[0].Port)
+	baseURL := fmt.Sprintf("%s:%d/api/v1/query_range", insts[0].Host, insts[0].Port)
 
 	// Prepare query parameters
 	params := url.Values{}

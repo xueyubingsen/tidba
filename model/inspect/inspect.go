@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -108,7 +109,7 @@ func (i *Insepctor) GenPDServerAPIPrefix() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("http://%s:%d/pd/api/v1", insts[0].Host, insts[0].Port), nil
+	return fmt.Sprintf("%s:%d/pd/api/v1", insts[0].Host, insts[0].Port), nil
 }
 
 func (i *Insepctor) GenPrometheusAPIPrefix(qpsQuery string, startTs, endTs time.Time) (string, error) {
@@ -116,7 +117,7 @@ func (i *Insepctor) GenPrometheusAPIPrefix(qpsQuery string, startTs, endTs time.
 	if err != nil {
 		return "", err
 	}
-	baseURL := fmt.Sprintf("http://%s:%d/api/v1/query_range", insts[0].Host, insts[0].Port)
+	baseURL := fmt.Sprintf("%s:%d/api/v1/query_range", insts[0].Host, insts[0].Port)
 
 	// Prepare query parameters
 	params := url.Values{}
@@ -142,7 +143,7 @@ func (i *Insepctor) GenNgMonitorAPIPrefix(startSecs, endSecs int64, accessComp, 
 		return "", fmt.Errorf("prometheus ng monitor port not found, ports: [%v]", promp[0].Ports)
 	}
 
-	return fmt.Sprintf("http://%s:%s/topsql/v1/summary?end=%d&instance=%s&instance_type=%s&start=%d&top=%d", promp[0].Host, portSli[len(portSli)-1], endSecs, instAddr, accessComp, startSecs, top), nil
+	return fmt.Sprintf("%s:%s/topsql/v1/summary?end=%d&instance=%s&instance_type=%s&start=%d&top=%d", promp[0].Host, portSli[len(portSli)-1], endSecs, instAddr, accessComp, startSecs, top), nil
 }
 
 type PromResp struct {
@@ -178,17 +179,22 @@ func (i *Insepctor) GetPromRequestAvgValueByNonMetric(req string, resp []byte) (
 
 		valNums := len(res.Values)
 		for _, r := range res.Values {
-			var valStr string
 			if r[1] == nil || r[1].(string) == "NaN" {
-				valStr = "0"
+				totalVal = totalVal.Add(decimal.NewFromInt(0))
 			} else {
-				valStr = r[1].(string)
+				switch r[1].(string) {
+				case "+Inf":
+					totalVal = totalVal.Add(decimal.NewFromFloat(math.MaxFloat64))
+				case "-Inf":
+					totalVal = totalVal.Add(decimal.NewFromFloat(-math.MaxFloat64))
+				default:
+					val, err := decimal.NewFromString(r[1].(string))
+					if err != nil {
+						return decimal.Decimal{}, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+					}
+					totalVal = totalVal.Add(val)
+				}
 			}
-			val, err := decimal.NewFromString(valStr)
-			if err != nil {
-				return decimal.Decimal{}, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
-			}
-			totalVal = totalVal.Add(val)
 		}
 		totalRes = totalVal.DivRound(decimal.NewFromInt(int64(valNums)), 2)
 	}
@@ -209,15 +215,22 @@ func (i *Insepctor) GetPromRequestMaxValueByNonMetric(req string, resp []byte) (
 	for _, res := range promResp.Data.Result {
 		maxVal := decimal.NewFromInt(0)
 		for _, r := range res.Values {
-			var valStr string
+			var val decimal.Decimal
 			if r[1] == nil || r[1].(string) == "NaN" {
-				valStr = "0"
+				val = decimal.NewFromInt(0)
 			} else {
-				valStr = r[1].(string)
-			}
-			val, err := decimal.NewFromString(valStr)
-			if err != nil {
-				return decimal.Decimal{}, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+				switch r[1].(string) {
+				case "+Inf":
+					val = decimal.NewFromFloat(math.MaxFloat64)
+				case "-Inf":
+					val = decimal.NewFromFloat(-math.MaxFloat64)
+				default:
+					var err error
+					val, err = decimal.NewFromString(r[1].(string))
+					if err != nil {
+						return decimal.Decimal{}, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+					}
+				}
 			}
 			if maxVal.LessThan(val) {
 				maxVal = val
@@ -244,15 +257,22 @@ func (i *Insepctor) GetPromRequestCurrentValueByNonMetric(req string, resp []byt
 	resNums := len(promResp.Data.Result)
 	for _, res := range promResp.Data.Result {
 		valNums := len(res.Values) - 1
-		var valStr string
+		var val decimal.Decimal
 		if res.Values[valNums][1] == nil || res.Values[valNums][1].(string) == "NaN" {
-			valStr = "0"
+			val = decimal.NewFromInt(0)
 		} else {
-			valStr = res.Values[valNums][1].(string)
-		}
-		val, err := decimal.NewFromString(valStr)
-		if err != nil {
-			return decimal.Decimal{}, fmt.Errorf("parse uint value [%s] failed: %v", res.Values[valNums][1], err)
+			switch res.Values[valNums][1].(string) {
+			case "+Inf":
+				val = decimal.NewFromFloat(math.MaxFloat64)
+			case "-Inf":
+				val = decimal.NewFromFloat(-math.MaxFloat64)
+			default:
+				var err error
+				val, err = decimal.NewFromString(res.Values[valNums][1].(string))
+				if err != nil {
+					return decimal.Decimal{}, fmt.Errorf("parse uint value [%s] failed: %v", res.Values[valNums][1], err)
+				}
+			}
 		}
 		totalRes = totalRes.Add(val)
 	}
@@ -278,16 +298,24 @@ func (i *Insepctor) GetPromRequestAvgValueByMetric(req string, resp []byte, pdRe
 
 		valNums := len(res.Values)
 		for _, r := range res.Values {
-			var valStr string
+			var val decimal.Decimal
 			if r[1] == nil || r[1].(string) == "NaN" {
-				valStr = "0"
+				val = decimal.NewFromInt(0)
 			} else {
-				valStr = r[1].(string)
+				switch r[1].(string) {
+				case "+Inf":
+					val = decimal.NewFromFloat(math.MaxFloat64)
+				case "-Inf":
+					val = decimal.NewFromFloat(-math.MaxFloat64)
+				default:
+					var err error
+					val, err = decimal.NewFromString(r[1].(string))
+					if err != nil {
+						return nil, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+					}
+				}
 			}
-			val, err := decimal.NewFromString(valStr)
-			if err != nil {
-				return nil, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
-			}
+
 			totalVal = totalVal.Add(val)
 		}
 		if len(pdRegionReq) > 0 {
@@ -317,15 +345,22 @@ func (i *Insepctor) GetPromRequestAvgDiskValueByMetric(req string, resp []byte) 
 
 		valNums := len(res.Values)
 		for _, r := range res.Values {
-			var valStr string
+			var val decimal.Decimal
 			if r[1] == nil || r[1].(string) == "NaN" {
-				valStr = "0"
+				val = decimal.NewFromInt(0)
 			} else {
-				valStr = r[1].(string)
-			}
-			val, err := decimal.NewFromString(valStr)
-			if err != nil {
-				return nil, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+				switch r[1].(string) {
+				case "+Inf":
+					val = decimal.NewFromFloat(math.MaxFloat64)
+				case "-Inf":
+					val = decimal.NewFromFloat(-math.MaxFloat64)
+				default:
+					var err error
+					val, err = decimal.NewFromString(r[1].(string))
+					if err != nil {
+						return nil, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+					}
+				}
 			}
 			totalVal = totalVal.Add(val)
 		}
@@ -360,15 +395,22 @@ func (i *Insepctor) GetPromRequestMaxValueByMetric(req string, resp []byte, pdRe
 		metric := res.Metric.(map[string]interface{})
 
 		for _, r := range res.Values {
-			var valStr string
+			var val decimal.Decimal
 			if r[1] == nil || r[1].(string) == "NaN" {
-				valStr = "0"
+				val = decimal.NewFromInt(0)
 			} else {
-				valStr = r[1].(string)
-			}
-			val, err := decimal.NewFromString(valStr)
-			if err != nil {
-				return nil, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+				switch r[1].(string) {
+				case "+Inf":
+					val = decimal.NewFromFloat(math.MaxFloat64)
+				case "-Inf":
+					val = decimal.NewFromFloat(-math.MaxFloat64)
+				default:
+					var err error
+					val, err = decimal.NewFromString(r[1].(string))
+					if err != nil {
+						return nil, fmt.Errorf("parse uint value [%s] failed: %v", r[1], err)
+					}
+				}
 			}
 			if maxVal.LessThan(val) {
 				maxVal = val

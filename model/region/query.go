@@ -43,7 +43,7 @@ func GenerateHotspotRegionQuerySql(clusterName, database string, storeAddrs []st
 		if err != nil {
 			return nil, err
 		}
-		allStores, err := getClusterStores(fmt.Sprintf("%s:%d", pdInsts[0].Host, pdInsts[0].Port))
+		allStores, err := getClusterStores(topo, fmt.Sprintf("%s:%d", pdInsts[0].Host, pdInsts[0].Port))
 		if err != nil {
 			return nil, err
 		}
@@ -119,10 +119,14 @@ WHERE
 }
 
 func GenerateLeaderDistributedQuerySql(clusterName, database string, storeAddrs []string, tables []string, indexes []string) ([]string, error) {
-	var stores []string
+	var (
+		stores []string
+		topo   *operator.ClusterTopology
+		err    error
+	)
 	// filter stores
 	if len(storeAddrs) > 0 {
-		topo, err := operator.GetDeployedClusterTopology(clusterName)
+		topo, err = operator.GetDeployedClusterTopology(clusterName)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +134,7 @@ func GenerateLeaderDistributedQuerySql(clusterName, database string, storeAddrs 
 		if err != nil {
 			return nil, err
 		}
-		allStores, err := getClusterStores(fmt.Sprintf("%s:%d", pdInsts[0].Host, pdInsts[0].Port))
+		allStores, err := getClusterStores(topo, fmt.Sprintf("%s:%d", pdInsts[0].Host, pdInsts[0].Port))
 		if err != nil {
 			return nil, err
 		}
@@ -235,11 +239,15 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 	startTime := time.Now()
 	queryTime := time.Now()
 
-	var pdAddr string
+	var (
+		topo   *operator.ClusterTopology
+		pdAddr string
+		err    error
+	)
 	if pdAddrs != "" {
 		pdAddr = pdAddrs
 	} else {
-		topo, err := operator.GetDeployedClusterTopology(clusterName)
+		topo, err = operator.GetDeployedClusterTopology(clusterName)
 		if err != nil {
 			return nil, err
 		}
@@ -250,21 +258,21 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 		pdAddr = fmt.Sprintf("%s:%d", pdInsts[0].Host, pdInsts[0].Port)
 	}
 
-	regions, err := getClusterRegions(pdAddr)
+	regions, err := getClusterRegions(topo, pdAddr)
 	if err != nil {
 		return nil, err
 	}
 	logger.Info(fmt.Sprintf("[Region] query cluster regions info in finished %fs", time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
-	cfgReplica, err := getClusterConfigReplica(pdAddr)
+	cfgReplica, err := getClusterConfigReplica(topo, pdAddr)
 	if err != nil {
 		return nil, err
 	}
 	logger.Info(fmt.Sprintf("[Region] query cluster config replica info in finished %fs", time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
-	allStores, err := getClusterStores(pdAddr)
+	allStores, err := getClusterStores(topo, pdAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -414,12 +422,16 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 }
 
 func QueryRegionIDInformation(ctx context.Context, clusterName string, db *mysql.Database, regionID []string, pdAddrs string, concurrency int) ([]*SingleRegion, error) {
-	var regions []*SingleRegion
-	var pdAddr string
+	var (
+		regions []*SingleRegion
+		topo    *operator.ClusterTopology
+		pdAddr  string
+		err     error
+	)
 	if pdAddrs != "" {
 		pdAddr = pdAddrs
 	} else {
-		topo, err := operator.GetDeployedClusterTopology(clusterName)
+		topo, err = operator.GetDeployedClusterTopology(clusterName)
 		if err != nil {
 			return nil, err
 		}
@@ -437,7 +449,7 @@ func QueryRegionIDInformation(ctx context.Context, clusterName string, db *mysql
 
 	for _, r := range regionID {
 		var singleRegion *SingleRegion
-		singleRegion, err = getClusterSingleRegion(pdAddr, r)
+		singleRegion, err = getClusterSingleRegion(topo, pdAddr, r)
 		if err != nil {
 			return regions, err
 		}

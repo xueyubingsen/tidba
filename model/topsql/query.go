@@ -16,13 +16,10 @@ limitations under the License.
 package topsql
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
-	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -358,7 +355,7 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, db *mysql.Databa
 				func() error {
 					url := generateTopsqlRequestAPI(ngAddr, startSecs, endSecs, addr, component, top)
 
-					resp, err := Request("GET", url, nil)
+					resp, err := request.Request(request.DefaultRequestMethodGet, url, nil, topo.ClusterMeta.TlsCaCert, topo.ClusterMeta.TlsClientCert, topo.ClusterMeta.TlsClientKey)
 					if err != nil {
 						return err
 					}
@@ -518,7 +515,7 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, db *mysql.Databa
 }
 
 func generateTopsqlRequestAPI(ngAddr string, startSec, endSec int64, instAddr, compName string, top int) string {
-	return fmt.Sprintf("http://%s/topsql/v1/summary?end=%d&instance=%s&instance_type=%s&start=%d&top=%d", ngAddr, endSec, instAddr, strings.ToLower(compName), startSec, top)
+	return fmt.Sprintf("%s/topsql/v1/summary?end=%d&instance=%s&instance_type=%s&start=%d&top=%d", ngAddr, endSec, instAddr, strings.ToLower(compName), startSec, top)
 }
 
 func GenerateTimestampTSO(nearly int, start, end string) (int64, int64, error) {
@@ -542,29 +539,6 @@ func GenerateTimestampTSO(nearly int, start, end string) (int64, int64, error) {
 		return 0, 0, err
 	}
 	return parsedStime.Unix(), parsedEtime.Unix(), nil
-}
-
-func Request(method, url string, body []byte) ([]byte, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return respBody, nil
 }
 
 /*
