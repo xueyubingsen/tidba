@@ -163,7 +163,7 @@ kill 命令功能集合：
 非交互命令
 $ ./tidba kill sql -c {clusterName} --sql-digests {sqlDigest1,sqlDigest2} [--duration 30] [--interval 500] [--concurrency 5]
 
-$ ./tidba kill sql -c {clusterName} --users {username1,username2} [--duration 30] [--interval 500]  [--concurrency 5]
+$ ./tidba kill user -c {clusterName} --users {username1,username2} [--duration 30] [--interval 500]  [--concurrency 5]
 
 交互式命令(除 tidba 字样之外其他保持一致)
 tidba[tidb-jwt00] »»» kill {subCommand} ...flags

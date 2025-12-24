@@ -343,7 +343,7 @@ func (topo *ClusterTopology) GetClusterComponentHostNodeExporterAddress() []stri
 	return ips
 }
 
-func (topo *ClusterTopology) GetClusterComponentStatusPortByTopSqlCPU() ([]string, []string, string) {
+func (topo *ClusterTopology) GetClusterComponentStatusPortByTopSqlCPU() ([]string, []string, string, error) {
 	var (
 		tidbs  []string
 		tikvs  []string
@@ -363,15 +363,13 @@ func (topo *ClusterTopology) GetClusterComponentStatusPortByTopSqlCPU() ([]strin
 			tikvs = append(tikvs, t.ID)
 		} else if t.ComponentName == ComponentNamePrometheus {
 			portSli := strings.Split(t.Ports, "/")
-			var ngPort string
-			if len(portSli) == 1 {
-				ngPort = portSli[0]
-			} else {
-				ngPort = portSli[1]
+
+			if len(portSli) < 4 || len(portSli) > 4 {
+				return nil, nil, "", fmt.Errorf("prometheus ng monitor port not found, ports: [%v]", t.Ports)
 			}
-			ngAddr = fmt.Sprintf("%s:%s", t.Host, ngPort)
+			ngAddr = fmt.Sprintf("%s:%s", t.Host, portSli[len(portSli)-1])
 		}
 
 	}
-	return tidbs, tikvs, ngAddr
+	return tidbs, tikvs, ngAddr, nil
 }

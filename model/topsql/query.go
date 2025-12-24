@@ -317,9 +317,15 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, db *mysql.Databa
 		addrs      []string
 	)
 	if strings.EqualFold(component, operator.ComponentNameTiDB) || strings.EqualFold(component, operator.ComponentNameUbiSQL) {
-		totalAddrs, _, ngAddr = topo.GetClusterComponentStatusPortByTopSqlCPU()
+		totalAddrs, _, ngAddr, err = topo.GetClusterComponentStatusPortByTopSqlCPU()
+		if err != nil {
+			return nil, err
+		}
 	} else if strings.EqualFold(component, operator.ComponentNameTiKV) {
-		_, totalAddrs, ngAddr = topo.GetClusterComponentStatusPortByTopSqlCPU()
+		_, totalAddrs, ngAddr, err = topo.GetClusterComponentStatusPortByTopSqlCPU()
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		return nil, fmt.Errorf("unknown component [%s], only support options for tidb / tikv", component)
 	}
