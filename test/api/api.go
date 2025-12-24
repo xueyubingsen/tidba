@@ -30,7 +30,7 @@ func main() {
 
 	apis := api("10.2.103.77", "9090", `tidb_server_plan_cache_instance_memory_usage{}`)
 
-	maxResp, err := request.Request(request.DefaultRequestMethodGet, apis, nil, "", "")
+	maxResp, err := request.Request(request.DefaultRequestMethodGet, apis, nil, "", "", "")
 	if err != nil {
 		panic(err)
 	}

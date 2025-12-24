@@ -18,9 +18,10 @@ package region
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"time"
+
+	"github.com/wentaojin/tidba/utils/cluster/operator"
+	"github.com/wentaojin/tidba/utils/request"
 )
 
 type Region struct {
@@ -112,77 +113,59 @@ type Response struct {
 	RegionInfo []string
 }
 
-func getClusterRegions(pdAddr string) (*Region, error) {
+func getClusterRegions(topo *operator.ClusterTopology, pdAddr string) (*Region, error) {
 	var region *Region
 
-	regionAPI := fmt.Sprintf("http://%s/pd/api/v1/regions", pdAddr)
-	response, err := http.Get(regionAPI)
+	regionAPI := fmt.Sprintf("%s/pd/api/v1/regions", pdAddr)
+
+	resp, err := request.Request(request.DefaultRequestMethodGet, regionAPI, nil, topo.ClusterMeta.TlsCaCert, topo.ClusterMeta.TlsClientCert, topo.ClusterMeta.TlsClientKey)
 	if err != nil {
-		return region, fmt.Errorf("http curl request get failed: %v", err)
+		return region, err
 	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return region, fmt.Errorf("read request data failed: %v", err)
-	}
-	if err := json.Unmarshal(body, &region); err != nil {
-		return region, fmt.Errorf("json Unmarshal struct region failed: %v", err)
+
+	if err := json.Unmarshal(resp, &region); err != nil {
+		return region, fmt.Errorf("json Unmarshal cluster region failed: %v", err)
 	}
 	return region, nil
 }
 
-func getClusterConfigReplica(pdAddr string) (*ConfigReplica, error) {
+func getClusterConfigReplica(topo *operator.ClusterTopology, pdAddr string) (*ConfigReplica, error) {
 	var cfgReplica *ConfigReplica
-	cfgReplicaAPI := fmt.Sprintf("http://%s/pd/api/v1/config/replicate", pdAddr)
-	response, err := http.Get(cfgReplicaAPI)
+	cfgReplicaAPI := fmt.Sprintf("%s/pd/api/v1/config/replicate", pdAddr)
+	resp, err := request.Request(request.DefaultRequestMethodGet, cfgReplicaAPI, nil, topo.ClusterMeta.TlsCaCert, topo.ClusterMeta.TlsClientCert, topo.ClusterMeta.TlsClientKey)
 	if err != nil {
-		return cfgReplica, fmt.Errorf("http curl request get failed: %v", err)
+		return cfgReplica, err
 	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return cfgReplica, fmt.Errorf("read request data failed: %v", err)
-	}
-	if err := json.Unmarshal(body, &cfgReplica); err != nil {
-		return cfgReplica, fmt.Errorf("json Unmarshal struct region failed: %v", err)
+	if err := json.Unmarshal(resp, &cfgReplica); err != nil {
+		return cfgReplica, fmt.Errorf("json Unmarshal cluster config replica failed: %v", err)
 	}
 	return cfgReplica, nil
 }
 
-func getClusterSingleRegion(pdAddr string, regionID string) (*SingleRegion, error) {
+func getClusterSingleRegion(topo *operator.ClusterTopology, pdAddr string, regionID string) (*SingleRegion, error) {
 	var region *SingleRegion
 
-	regionAPI := fmt.Sprintf("http://%s/pd/api/v1/region/id/%s", pdAddr, regionID)
-	response, err := http.Get(regionAPI)
+	regionAPI := fmt.Sprintf("%s/pd/api/v1/region/id/%s", pdAddr, regionID)
+	resp, err := request.Request(request.DefaultRequestMethodGet, regionAPI, nil, topo.ClusterMeta.TlsCaCert, topo.ClusterMeta.TlsClientCert, topo.ClusterMeta.TlsClientKey)
 	if err != nil {
-		return region, fmt.Errorf("http curl request get failed: %v", err)
+		return region, err
 	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return region, fmt.Errorf("read request data failed: %v", err)
-	}
-	if err := json.Unmarshal(body, &region); err != nil {
-		return region, fmt.Errorf("json Unmarshal struct region failed: %v", err)
+	if err := json.Unmarshal(resp, &region); err != nil {
+		return region, fmt.Errorf("json Unmarshal cluster single region failed: %v", err)
 	}
 	return region, nil
 }
 
-func getClusterStores(pdAddr string) (*Store, error) {
+func getClusterStores(topo *operator.ClusterTopology, pdAddr string) (*Store, error) {
 	var store *Store
 
-	storeAPI := fmt.Sprintf("http://%s/pd/api/v1/stores", pdAddr)
-	response, err := http.Get(storeAPI)
+	storeAPI := fmt.Sprintf("%s/pd/api/v1/stores", pdAddr)
+	resp, err := request.Request(request.DefaultRequestMethodGet, storeAPI, nil, topo.ClusterMeta.TlsCaCert, topo.ClusterMeta.TlsClientCert, topo.ClusterMeta.TlsClientKey)
 	if err != nil {
-		return store, fmt.Errorf("http curl request get failed: %v", err)
+		return store, err
 	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return store, fmt.Errorf("read request data failed: %v", err)
-	}
-	if err := json.Unmarshal(body, &store); err != nil {
-		return store, fmt.Errorf("json Unmarshal struct region failed: %v", err)
+	if err := json.Unmarshal(resp, &store); err != nil {
+		return store, fmt.Errorf("json Unmarshal cluster store failed: %v", err)
 	}
 	return store, nil
 }

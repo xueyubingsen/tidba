@@ -55,9 +55,19 @@ func TopsqlRunaway(ctx context.Context, clusterName string, resourceGroup, sqlDi
 	if err != nil {
 		return nil, nil, err
 	}
+
 	vers := strings.Split(res[0]["VERSION"], "-")
 
-	if stringutil.VersionOrdinal(strings.TrimPrefix(vers[len(vers)-1], "v")) < stringutil.VersionOrdinal("8.5.0") {
+	// 适配平凯数据库版本 8.0.11-TiDB-v7.1.8-5.2
+	var version string
+	if len(vers) > 3 {
+		tmpVers := strings.Split(strings.TrimPrefix(vers[len(vers)-2], "v"), ".")
+		version = fmt.Sprintf("%s.%s", tmpVers[len(tmpVers)-1], vers[len(vers)-1])
+	} else {
+		version = strings.TrimPrefix(vers[len(vers)-1], "v")
+	}
+
+	if stringutil.VersionOrdinal(version) < stringutil.VersionOrdinal("8.5.0") {
 		return nil, nil, fmt.Errorf("the cluster [%s] database version [%s] not meet requirement, require version >= v8.5.0, need use SWITCH_GROUP feature", clusterName, vers[len(vers)-1])
 	}
 

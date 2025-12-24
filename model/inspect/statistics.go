@@ -139,55 +139,56 @@ WHERE h.table_id NOT IN (
 			CheckSeq:      autoInc.Next(),
 			CheckItem:     "是否存在普通表缺失统计信息",
 			CheckStandard: "检查是否存在普通表缺失统计信息",
-			CheckSql: `SELECT CONCAT(info2.tb_schema, '.', info2.tb_name) AS SQL_RESULT
-FROM (
-	SELECT info.tb_schema, info.tb_name, MAX(DATE_FORMAT(tidb_parse_tso(version), '%Y-%m-%d %H:%i:%s')) AS analyze_time, SUM(stats_ver) AS stats_version, COUNT(1) AS hist_count 
-	FROM (
-		SELECT tb.TABLE_SCHEMA AS tb_schema, tb.TABLE_NAME AS tb_name, tb.tidb_table_id, sm.table_id, sm.hist_id, sm.version, sm.stats_ver 
-		FROM information_schema.tables tb 
-		LEFT JOIN mysql.stats_histograms sm 
-		ON tb.tidb_table_id = sm.table_id 
-		WHERE tb.TABLE_TYPE = 'BASE TABLE' 
-		AND tb.CREATE_OPTIONS <> 'partitioned' 
-		AND tb.TABLE_SCHEMA NOT IN ('mysql', 'INFORMATION_SCHEMA', 'PERFORMANCE_SCHEMA', 'METRICS_SCHEMA')
-	) info 
-	GROUP BY info.tb_schema, info.tb_name
-) info2 
-WHERE stats_version = 0 OR stats_version IS NULL 
-ORDER BY info2.tb_schema, info2.tb_name`,
+			CheckSql: `WITH tb AS (
+  SELECT
+    table_schema,
+    table_name,
+    tidb_table_id
+  FROM information_schema.tables
+  WHERE table_schema NOT IN ('mysql','INFORMATION_SCHEMA','PERFORMANCE_SCHEMA','METRICS_SCHEMA')
+    AND table_type IN ('BASE TABLE','SEQUENCE') 
+    AND COALESCE(create_options,'') NOT LIKE '%partitioned%'
+),
+st AS (
+  SELECT
+    table_id,
+    MAX(stats_ver) AS max_stats_ver
+  FROM mysql.stats_histograms
+  GROUP BY table_id
+)
+SELECT
+  CONCAT(tb.table_schema, '.', tb.table_name) AS SQL_RESULT
+FROM tb
+LEFT JOIN st ON tb.tidb_table_id = st.table_id
+WHERE COALESCE(st.max_stats_ver, 0) = 0`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
 			CheckItem:     "是否存在分区缺失 partition 统计信息",
 			CheckStandard: "检查是否存在分区缺失 partition 统计信息",
-			CheckSql: `SELECT CONCAT(info3.tb_schema, '.', info3.tb_name, '.', info3.partition_name) AS SQL_RESULT 
-FROM (
-	SELECT info2.tb_schema, info2.tb_name, info2.partition_name, CASE 
-		WHEN stats_version = 0 OR stats_version IS NULL THEN 'Miss Stats' 
-		WHEN stats_version > 0 THEN 'Normal stats' ELSE 'Error Stats' 
-	END AS Stats_info, CASE 
-		WHEN stats_version > 0 THEN STR_TO_DATE(analyze_time, '%Y-%m-%d %H:%i:%s') 
-		WHEN stats_version = 0 OR stats_version IS NULL THEN 'No Analyze Time' 
-		ELSE 'No Analyze Time' 
-	END AS Analyze_Time 
-	FROM (
-		SELECT info.tb_schema, info.tb_name, info.partition_name, MAX(DATE_FORMAT(tidb_parse_tso(version), '%Y-%m-%d %H:%i:%s')) AS analyze_time, SUM(stats_ver) AS stats_version, COUNT(1) AS hist_count 
-		FROM (
-			SELECT tb.TABLE_SCHEMA AS tb_schema, tb.TABLE_NAME AS tb_name, tbp.partition_name, tb.tidb_table_id, tbp.TIDB_PARTITION_ID, sm.table_id, sm.hist_id, sm.version, sm.stats_ver 
-			FROM information_schema.tables tb 
-			LEFT JOIN information_schema.partitions tbp 
-			ON tb.table_schema = tbp.table_schema AND tb.table_name = tbp.table_name 
-			LEFT JOIN mysql.stats_histograms sm 
-			ON tbp.TIDB_PARTITION_ID = sm.table_id 
-			WHERE tbp.partition_name IS NOT NULL 
-			AND tb.TABLE_TYPE = 'BASE TABLE' 
-			AND tb.CREATE_OPTIONS = 'partitioned'
-		) info 
-		GROUP BY info.tb_schema, info.tb_name, partition_name
-	) info2
-) info3 
-WHERE info3.Stats_info <> 'Normal stats' 
-ORDER BY info3.tb_schema, info3.tb_name, info3.partition_name`,
+			CheckSql: `WITH pt AS (
+  SELECT
+    p.table_schema,
+    p.table_name,
+    p.partition_name,
+    p.tidb_partition_id
+  FROM information_schema.partitions p
+  WHERE p.partition_name IS NOT NULL
+    AND p.table_schema NOT IN ('mysql','INFORMATION_SCHEMA','PERFORMANCE_SCHEMA','METRICS_SCHEMA')
+),
+st AS (
+  SELECT
+    table_id,
+    MAX(COALESCE(stats_ver, 0)) AS max_stats_ver
+  FROM mysql.stats_histograms
+  GROUP BY table_id
+)
+SELECT
+  CONCAT(pt.table_schema, '.', pt.table_name, '.', pt.partition_name) AS SQL_RESULT
+FROM pt
+LEFT JOIN st
+  ON pt.tidb_partition_id = st.table_id
+WHERE COALESCE(st.max_stats_ver, 0) = 0`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),

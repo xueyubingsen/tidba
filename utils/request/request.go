@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -29,8 +30,8 @@ const (
 	DefaultRequestMethodPost = "POST"
 )
 
-func Request(method, url string, body []byte, cacertPath, certPath string) ([]byte, error) {
-	client, err := createHTTPClient(cacertPath, certPath)
+func Request(method, url string, body []byte, cacertPath, certPath, keyPath string) ([]byte, error) {
+	client, err := createHTTPClient(cacertPath, certPath, keyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -44,17 +45,17 @@ func Request(method, url string, body []byte, cacertPath, certPath string) ([]by
 }
 
 // createHTTPClient creates an HTTP client with optional TLS configuration.
-func createHTTPClient(cacertPath, certPath string) (*http.Client, error) {
+func createHTTPClient(cacertPath, certPath, keyPath string) (*http.Client, error) {
 	var tlsConfig *tls.Config
 
-	// If either cacertPath or certPath is provided, set up TLS config
-	if cacertPath != "" || certPath != "" {
+	// If any of cacertPath, certPath, or keyPath is provided, set up TLS config
+	if cacertPath != "" || certPath != "" || keyPath != "" {
 		caCertPool, err := loadCACert(cacertPath)
 		if err != nil {
 			return nil, err
 		}
 
-		cert, err := loadClientCert(certPath)
+		cert, err := loadClientCert(certPath, keyPath)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +79,7 @@ func loadCACert(cacertPath string) (*x509.CertPool, error) {
 
 	caCert, err := os.ReadFile(cacertPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read CA cert file [%s] failed: %v", cacertPath, err)
 	}
 
 	caCertPool := x509.NewCertPool()
@@ -87,15 +88,16 @@ func loadCACert(cacertPath string) (*x509.CertPool, error) {
 	return caCertPool, nil
 }
 
-// loadClientCert loads the client certificate from the given path.
-func loadClientCert(certPath string) (tls.Certificate, error) {
-	if certPath == "" {
+// loadClientCert loads the client certificate and key from the given paths.
+func loadClientCert(certPath, keyPath string) (tls.Certificate, error) {
+	if certPath == "" && keyPath == "" {
 		return tls.Certificate{}, nil
 	}
 
-	cert, err := tls.LoadX509KeyPair(certPath, certPath)
+	// Both certPath and keyPath are required if either is provided
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
-		return tls.Certificate{}, err
+		return tls.Certificate{}, fmt.Errorf("load client cert file [%s] and key file [%s] failed: %v", certPath, keyPath, err)
 	}
 
 	return cert, nil
@@ -108,9 +110,17 @@ func doRequest(client *http.Client, method, url string, body []byte) ([]byte, er
 		reqBody = bytes.NewBuffer(body)
 	}
 
+	// Check if TLS is configured by examining the client's transport
+	if transport, ok := client.Transport.(*http.Transport); ok && transport.TLSClientConfig != nil {
+		// If it's not HTTP or HTTPS, append HTTPS (though this is unusual)
+		url = fmt.Sprintf("https://%s", url)
+	} else {
+		url = fmt.Sprintf("http://%s", url)
+	}
+
 	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create HTTP request [%s] failed: %v", url, err)
 	}
 
 	if method != http.MethodGet && body != nil {
@@ -119,13 +129,13 @@ func doRequest(client *http.Client, method, url string, body []byte) ([]byte, er
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("send HTTP request [%s] failed: %v", url, err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read HTTP response body failed: %v", err)
 	}
 
 	return respBody, nil
