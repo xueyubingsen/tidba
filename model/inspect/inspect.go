@@ -42,6 +42,26 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+/*
+## 所需最小 sudo 权限（inspect）其他命令不依赖 sudo，而依赖数据库或者API访问
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c lscpu*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c (command -v numactl*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c free*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c cat*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c mountpoint*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c (command -v swapon*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c grep*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c grubby*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c id*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c (chage -l*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c if*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c sysctl*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c crontab -l*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c dmesg*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c head*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c tail*
+*/
+
 const ClusterInspectMinDatabaseVersionRequire = "6.5.0"
 const ClusterInspectMinSplitBucketSchedulerRequire = "7.1.0"
 
