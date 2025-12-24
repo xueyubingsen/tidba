@@ -27,6 +27,26 @@ TiDB 数据库 DBA 运维工具集（交互式 / 非交互式 CLI），涵盖数
     ```
 ---
 
+```shell
+## 所需最小 sudo 权限（inspect）
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c lscpu*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c (command -v numactl*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c free*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c cat*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c mountpoint*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c (command -v swapon*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c grep*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c grubby*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c id*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c (chage -l*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c if*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c sysctl*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c crontab -l*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c dmesg*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c head*
+{username} ALL=(root) NOPASSWD: /usr/bin/bash -c tail*
+```
+
 ### Inspect 命令
 
 inspect 命令功能集：
