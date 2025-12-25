@@ -1,4 +1,4 @@
-//go:build license
+//go:build nolicense
 
 package cmd
 
